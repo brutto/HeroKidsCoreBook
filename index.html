@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Hero Kids — двуязычный ридер (скелет)</title>
+  <link rel="stylesheet" href="assets/css/styles.css"/>
+</head>
+<body>
+<header class="header">
+  <div class="nav">
+    <div class="brand">Hero Kids — ридер </div>
+    <div class="small" style="margin-left:8px">50 страниц</div>
+  </div>
+</header>
+<main class="wrapper grid">
+  <aside class="sidebar" id="sidebar-menu">
+    <!-- Меню загружается сюда из menu.html -->
+  </aside>
+  <section class="panel">
+    <p>Это <strong>полный скелет</strong> сайта: для каждой страницы слева показано изображение страницы из PDF, справа — блок для вставки перевода.</p>
+    <ol>
+      <li>Откройте нужную страницу <code>pages/page-XXX.html</code>.</li>
+      <li>Замените содержимое в блоке <code>&lt;article id="translated"&gt;…&lt;/article&gt;</code> (между маркерами <code>TRANSLATION_START/END</code>) вашим переведённым HTML.</li>
+      <li>Сохраните файл — навигация вперёд/назад и оглавление уже работают.</li>
+    </ol>
+    <p class="small">Подсказка: я буду выдавать вам готовый HTML для каждой страницы — вы просто вставляете его в указанный блок.</p>
+    <p><a class="btn" href="pages/page-001.html">Открыть с первой страницы →</a></p>
+  </section>
+</main>
+<script src="assets/js/menu-loader.js"></script>
+<footer>Собрано из предоставленного PDF. Для личного использования.</footer>
+</body>
+</html>
