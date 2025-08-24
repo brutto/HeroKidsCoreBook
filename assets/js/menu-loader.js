@@ -1,4 +1,4 @@
-fetch('../menu.html')
+fetch('/menu.html')
   .then(response => response.text())
   .then(html => {
 
