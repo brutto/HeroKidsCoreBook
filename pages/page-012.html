@@ -21,36 +21,49 @@
   <section>
     
     <div class="navpager">
-      <a class="btn" href="page-011.html">← Предыдущая</a>
-      <a class="btn" href="page-013.html">Следующая →</a>
+      <a class="btn" href="page-0111.html">← Предыдущая</a>
+      <a class="btn" href="page-0121.html">Следующая →</a>
     </div>
     
     <div class="viewer">
-      <div class="panel">
-        <img class="pageimg" src="../assets/images/page-012.png" alt="Страница 12 изображения PDF"/>
+      <div class="panel" style="position:relative;">
+        <img class="pageimg" id="pageimg" src="../assets/images/page-012.png" alt="Страница 10 изображения PDF"/>
+        <button id="zoom-btn" class="btn zoom-icon" style="position:absolute;top:16px;right:16px;z-index:100;">🔍+</button>
+        <!-- Внутри zoom-modal -->
+        <div id="zoom-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);z-index:200;justify-content:center;align-items:center;">
+          <div style="position:relative;display:inline-block;">
+            <img id="zoomed-img" src="../assets/images/page-012.png" style="max-width:90vw;max-height:90vh;box-shadow:0 4px 32px #000;">
+            <button id="close-zoom-btn" class="btn zoom-icon" style="position:absolute;top:4px;right:4px;">🔍-</button>
+          </div>
+        </div>
       </div>
       <article class="panel translated" id="translated">
         <!-- TRANSLATION_START -->
-        <h2>Перевод страницы 12</h2>
-        
-    <div class="placeholder">
-      <p><strong>Заглушка перевода.</strong> Скопируйте выданный мной HTML перевода для страницы 12 и вставьте его <em>между маркерами</em> ниже.</p>
-      <div class="code"><code>&lt;!-- TRANSLATION_START --&gt;<br>... сюда вставить HTML перевода ...<br>&lt;!-- TRANSLATION_END --&gt;</code></div>
-      <p>Или просто замените содержимое тега <code>&lt;article id="translated"&gt;...&lt;/article&gt;</code>.</p>
-    </div>
-    
+        <h2>Обычная атака</h2>
+        <p>
+          Все герои и монстры имеют обычное действие — атаку.
+          Это может быть ближняя, дальняя или магическая атака.
+          Некоторые персонажи могут владеть несколькими видами атак.
+          Обычная атака наносит 1 единицу урона.
+        </p>
+        <ul>
+          <li><strong>Ближняя атака:</strong> цель — соседний персонаж. По врагам, сбитым с ног, добавляется 1 кубик.</li>
+          <li><strong>Дальняя атака:</strong> цель — персонаж на расстоянии до 6 клеток (включая по диагонали) при условии видимости. По соседним целям бросается на 1 кубик меньше.</li>
+          <li><strong>Магическая атака:</strong> цель — персонаж на расстоянии до 4 клеток (включая по диагонали) при условии видимости.</li>
+        </ul>
         <!-- TRANSLATION_END -->
       </article>
     </div>
     
     <div class="navpager">
-      <a class="btn" href="page-011.html">← Предыдущая</a>
-      <a class="btn" href="page-013.html">Следующая →</a>
+      <a class="btn" href="page-0111.html">← Предыдущая</a>
+      <a class="btn" href="page-0121.html">Следующая →</a>
     </div>
     
   </section>
 </main>
 <script src="../assets/js/menu-loader.js"></script>
+<script src="../assets/js/image-zoom.js"></script>
 <footer>Статичный сайт для личного использования. Изображение — рендер PDF; справа — блок для перевода.</footer>
 </body>
 </html>

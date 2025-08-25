@@ -21,36 +21,59 @@
   <section>
     
     <div class="navpager">
-      <a class="btn" href="page-010.html">← Предыдущая</a>
-      <a class="btn" href="page-012.html">Следующая →</a>
+      <a class="btn" href="page-0103.html">← Предыдущая</a>
+      <a class="btn" href="page-0111.html">Следующая →</a>
     </div>
     
     <div class="viewer">
-      <div class="panel">
-        <img class="pageimg" src="../assets/images/page-011.png" alt="Страница 11 изображения PDF"/>
+      <div class="panel" style="position:relative;">
+        <img class="pageimg" id="pageimg" src="../assets/images/page-011.png" alt="Страница 10 изображения PDF"/>
+        <button id="zoom-btn" class="btn zoom-icon" style="position:absolute;top:16px;right:16px;z-index:100;">🔍+</button>
+        <!-- Внутри zoom-modal -->
+        <div id="zoom-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);z-index:200;justify-content:center;align-items:center;">
+          <div style="position:relative;display:inline-block;">
+            <img id="zoomed-img" src="../assets/images/page-011.png" style="max-width:90vw;max-height:90vh;box-shadow:0 4px 32px #000;">
+            <button id="close-zoom-btn" class="btn zoom-icon" style="position:absolute;top:4px;right:4px;">🔍-</button>
+          </div>
+        </div>
       </div>
       <article class="panel translated" id="translated">
         <!-- TRANSLATION_START -->
-        <h2>Перевод страницы 11</h2>
-        
-    <div class="placeholder">
-      <p><strong>Заглушка перевода.</strong> Скопируйте выданный мной HTML перевода для страницы 11 и вставьте его <em>между маркерами</em> ниже.</p>
-      <div class="code"><code>&lt;!-- TRANSLATION_START --&gt;<br>... сюда вставить HTML перевода ...<br>&lt;!-- TRANSLATION_END --&gt;</code></div>
-      <p>Или просто замените содержимое тега <code>&lt;article id="translated"&gt;...&lt;/article&gt;</code>.</p>
-    </div>
-    
+        <h2>Карточки героев</h2>
+        <p>
+          Все сведения о героях и монстрах собраны на специальных карточках.
+          Они содержат всю информацию, необходимую для игры этим персонажем.
+        </p>
+        <p>
+          На карточке героя вы найдёте такие характеристики:
+        </p>
+        <ul>
+          <li>Кубики ближнего боя (Melee Dice Pool)</li>
+          <li>Кубики дальнего боя (Ranged Dice Pool)</li>
+          <li>Кубики магии (Magic Dice Pool)</li>
+          <li>Кубики брони (Armor Dice Pool)</li>
+          <li>Ячейки здоровья (Health Boxes)</li>
+        </ul>
+        <ul>
+          <li>Обычные атаки</li>
+          <li>Особое действие</li>
+          <li>Дополнительная способность</li>
+          <li>Инвентарь</li>
+          <li>Навыки</li>
+        </ul>
         <!-- TRANSLATION_END -->
       </article>
     </div>
     
     <div class="navpager">
-      <a class="btn" href="page-010.html">← Предыдущая</a>
-      <a class="btn" href="page-012.html">Следующая →</a>
+      <a class="btn" href="page-0103.html">← Предыдущая</a>
+      <a class="btn" href="page-0111.html">Следующая →</a>
     </div>
     
   </section>
 </main>
 <script src="../assets/js/menu-loader.js"></script>
+<script src="../assets/js/image-zoom.js"></script>
 <footer>Статичный сайт для личного использования. Изображение — рендер PDF; справа — блок для перевода.</footer>
 </body>
 </html>

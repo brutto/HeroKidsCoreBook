@@ -26,8 +26,16 @@
     </div>
     
     <div class="viewer">
-      <div class="panel">
-        <img class="pageimg" src="../assets/images/page-006.png" alt="Страница 6 изображения PDF"/>
+      <div class="panel" style="position:relative;">
+        <img class="pageimg" id="pageimg" src="../assets/images/page-006.png" alt="Страница 10 изображения PDF"/>
+        <button id="zoom-btn" class="btn zoom-icon" style="position:absolute;top:16px;right:16px;z-index:100;">🔍+</button>
+        <!-- Внутри zoom-modal -->
+        <div id="zoom-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);z-index:200;justify-content:center;align-items:center;">
+          <div style="position:relative;display:inline-block;">
+            <img id="zoomed-img" src="../assets/images/page-006.png" style="max-width:90vw;max-height:90vh;box-shadow:0 4px 32px #000;">
+            <button id="close-zoom-btn" class="btn zoom-icon" style="position:absolute;top:4px;right:4px;">🔍-</button>
+          </div>
+        </div>
       </div>
       <article class="panel translated" id="translated">
         <!-- TRANSLATION_START -->
@@ -57,6 +65,7 @@
   </section>
 </main>
 <script src="../assets/js/menu-loader.js"></script>
+<script src="../assets/js/image-zoom.js"></script>
 <footer>Статичный сайт для личного использования. Изображение — рендер PDF; справа — блок для перевода.</footer>
 </body>
 </html>
