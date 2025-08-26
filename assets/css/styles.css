@@ -61,3 +61,35 @@ footer{color:var(--muted); text-align:center; margin:12px 0 24px}
 #close-zoom-btn:hover {
   background-color: rgba(0, 0, 0, 1); /* полностью белый при наведении */
 }
+
+/*#sidebar-menu a.active {*/
+/*  background: rgba(102,252,241,.12);*/
+/*  color: var(--accent, #66fcf1);*/
+/*  border-radius: 8px;*/
+/*}*/
+
+#sidebar-menu a {
+  display: block;
+  padding: 4px 8px;        /* компактные отступы */
+  position: relative;
+  font-size: 14px;         /* можно чуть меньше шрифт */
+  line-height: 1.4;
+  color: inherit;
+  text-decoration: none;
+}
+
+#sidebar-menu a.active {
+  color: var(--accent, #66fcf1);
+  font-weight: 600;
+}
+
+#sidebar-menu a.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;              /* тоньше полоска */
+  background: var(--accent, #66fcf1);
+  border-radius: 0 3px 3px 0;
+}

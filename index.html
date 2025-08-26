@@ -3,32 +3,65 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Hero Kids — двуязычный ридер (скелет)</title>
-  <link rel="stylesheet" href="/assets/css/styles.css"/>
+  <title>Hero Kids — страница 01</title>
+  <link rel="stylesheet" href="./assets/css/styles.css"/>
 </head>
 <body>
 <header class="header">
   <div class="nav">
-    <div class="brand">Hero Kids — ридер </div>
-    <div class="small" style="margin-left:8px">50 страниц</div>
+    <div class="brand">Hero Kids - Core Book на русском</div>
+    <div class="small" style="margin-left:8px">Стр. 1 из 50</div>
+    <div style="margin-left:auto"><a class="btn" id="home" href="./index.html">Обложка</a></div>
   </div>
 </header>
 <main class="wrapper grid">
   <aside class="sidebar" id="sidebar-menu">
     <!-- Меню загружается сюда из menu.html -->
   </aside>
-  <section class="panel">
-    <p>Это <strong>полный скелет</strong> сайта: для каждой страницы слева показано изображение страницы из PDF, справа — блок для вставки перевода.</p>
-    <ol>
-      <li>Откройте нужную страницу <code>pages/page-XXX.html</code>.</li>
-      <li>Замените содержимое в блоке <code>&lt;article id="translated"&gt;…&lt;/article&gt;</code> (между маркерами <code>TRANSLATION_START/END</code>) вашим переведённым HTML.</li>
-      <li>Сохраните файл — навигация вперёд/назад и оглавление уже работают.</li>
-    </ol>
-    <p class="small">Подсказка: я буду выдавать вам готовый HTML для каждой страницы — вы просто вставляете его в указанный блок.</p>
-    <p><a class="btn" href="/pages/page-001.html">Открыть с первой страницы →</a></p>
+  <section>
+
+    <div class="navpager">
+      <span></span>
+      <a class="btn" href="/pages/page-002.html">Следующая →</a>
+    </div>
+
+    <div class="viewer">
+      <div class="panel" style="position:relative;">
+        <img class="pageimg" id="pageimg" src="./assets/images/page-001.png" alt="Страница 1 изображения PDF"/>
+        <button id="zoom-btn" class="btn zoom-icon" style="position:absolute;top:16px;right:16px;z-index:100;">🔍+</button>
+        <!-- Внутри zoom-modal -->
+        <div id="zoom-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);z-index:200;justify-content:center;align-items:center;">
+          <div style="position:relative;display:inline-block;">
+            <img id="zoomed-img" src="./assets/images/page-001.png" style="max-width:90vw;max-height:90vh;box-shadow:0 4px 32px #000;">
+            <button id="close-zoom-btn" class="btn zoom-icon" style="position:absolute;top:4px;right:4px;">🔍-</button>
+          </div>
+        </div>
+      </div>
+      <article class="panel translated" id="translated">
+        <!-- TRANSLATION_START -->
+        <h1>Hero Kids — фэнтези-ролевая игра</h1>
+        <p class="small">Настольная ролевая игра для детей <strong>4–10 лет</strong>.</p>
+
+        <p><em>Автор: Джастин Хэллидей (Justin Halliday)</em></p>
+
+        <hr>
+
+        <p>
+          Эта страница — обложка издания. Основные разделы и правила начинаются на последующих страницах.
+        </p>
+        <!-- TRANSLATION_END -->
+      </article>
+    </div>
+
+    <div class="navpager">
+      <span></span>
+      <a class="btn" href="/pages/page-002.html">Следующая →</a>
+    </div>
+
   </section>
 </main>
-<script src="/assets/js/menu-loader.js"></script>
-<footer>Собрано из предоставленного PDF. Для личного использования.</footer>
+<script src="./assets/js/menu-loader.js"></script>
+<script src="./assets/js/image-zoom.js"></script>
+<footer>Настоящий перевод подготовлен для личного и некоммерческого использования и не является официальной локализацией.</footer>
 </body>
 </html>
