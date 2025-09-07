@@ -13,6 +13,14 @@
   const lightbox = document.getElementById('lightbox');
   const pdfFull = document.getElementById('pdfFull');
   const closeLightbox = document.getElementById('closeLightbox');
+  const controls = document.querySelector('.controls');
+
+  // кнопка включения полноэкранного режима
+  const fullscreenBtn = document.createElement('button');
+  fullscreenBtn.id = 'fullscreenBtn';
+  fullscreenBtn.textContent = '⤢';
+  fullscreenBtn.title = 'Полноэкранный режим';
+  controls.appendChild(fullscreenBtn);
 
   // State
   let page = 1;
@@ -134,6 +142,21 @@
   }
   pdfWrap.addEventListener('click', ()=> toggleLightbox(true));
   closeLightbox.addEventListener('click', ()=> toggleLightbox(false));
+
+  // переключение полноэкранного режима
+  fullscreenBtn.addEventListener('click', ()=>{
+    const entering = !document.body.classList.contains('fullscreen');
+    document.body.classList.toggle('fullscreen');
+    if(entering){
+      fullscreenBtn.classList.add('floating');
+      fullscreenBtn.textContent = '⤡';
+      document.body.appendChild(fullscreenBtn);
+    }else{
+      fullscreenBtn.classList.remove('floating');
+      fullscreenBtn.textContent = '⤢';
+      controls.appendChild(fullscreenBtn);
+    }
+  });
 
   // Initialize
   render();
