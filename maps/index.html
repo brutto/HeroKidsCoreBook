@@ -8,7 +8,7 @@
     :root{
       --bg:#0b0c10; --paper:#0f1218; --text:#e6eef8; --muted:#a8b2c1; --border:#20242c; --accent:#66fcf1;
       --token:#ffd166; --token-stroke:#333; --token-shadow: drop-shadow(0 2px 4px rgba(0,0,0,.4));
-      --grid:#66fcf1;
+      --grid:#363636;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
@@ -51,7 +51,7 @@
   <label>Клетка: <input id="cell" class="num" type="number" min="4" step="1" value="32"></label>
   <label>Поворот: <input id="angle" class="num" type="number" step="1" value="0">°</label>
   <label>Прозрачность: <input id="alpha" type="range" min="0" max="1" step="0.05" value="0.35"></label>
-  <label>Цвет сетки: <input id="color" type="color" value="#66fcf1"></label>
+  <label>Цвет сетки: <input id="color" type="color" value="#363636"></label>
   <label><input id="showGrid" type="checkbox" checked> Сетка</label>
   <label><input id="snap" type="checkbox" checked> Привязка (к центрам)</label>
 
@@ -116,7 +116,7 @@
     cell:32,
     angle:0,
     alpha:0.35,
-    gridColor:'#66fcf1',
+    gridColor:'#363636',
     snap:true,
     showGrid:true,
     tokenSizeCells:1.0,
