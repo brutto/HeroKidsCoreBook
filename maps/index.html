@@ -67,6 +67,7 @@
   <button id="btnAdd" class="btn">Фишка</button>
   <button id="btnSave" class="btn">Сохранить</button>
   <button id="btnLoad" class="btn">Загрузить</button>
+  <input id="stateFile" type="file" accept=".json" hidden>
 </div>
 
 <div id="host">
@@ -106,6 +107,9 @@
 
   const layersList = document.getElementById('layersList');
   const tokenCount = document.getElementById('tokenCount');
+  const stateFileInput = document.getElementById('stateFile');
+
+  const LS_KEY = 'vtt_map_state_v1';
 
   let svg=null, tokensLayer=null, gridLayer=null, contentLayer=null;
   let dragging=null; let panning=null;
@@ -122,6 +126,7 @@
     tokenSizeCells:1.0,
     tokenColor:'#ffd166',
     baseVB:{x:0,y:0,w:1000,h:1000},
+    bg:null,
   };
 
   // === UI bindings ===
@@ -150,10 +155,15 @@
   async function handleFile(f){
     const name = f.name.toLowerCase();
     if (name.endsWith('.svg') || f.type === 'image/svg+xml'){
-      mountSVG(await f.text());
+      const text = await f.text();
+      state.bg = {type:'svg', data:text};
+      await mountSVG(text);
     } else if (name.match(/\.(png|jpe?g)$/) || /^image\/(png|jpeg)$/.test(f.type)){
-      mountImage(await fileToDataURL(f));
+      const url = await fileToDataURL(f);
+      state.bg = {type:'image', data:url};
+      await mountImage(url);
     }
+    saveToLocal();
   }
 
   function fileToDataURL(f){
@@ -168,7 +178,7 @@
   function mountSVG(text){
     svgBox.innerHTML='';
     const tmp=document.createElement('div'); tmp.innerHTML=text.trim();
-    const found=tmp.querySelector('svg'); if(!found){ svgBox.textContent='SVG не найден'; return; }
+    const found=tmp.querySelector('svg'); if(!found){ svgBox.textContent='SVG не найден'; return Promise.resolve(); }
     svg = found;
     ensureViewBox(svg);
     const vb = svg.getAttribute('viewBox').trim().split(/\s+/).map(parseFloat);
@@ -191,41 +201,45 @@
 
     // пересчитать список слоёв (если svg перезагружен)
     rebuildLayersPanel();
+    return Promise.resolve();
   }
 
   function mountImage(url){
-    svgBox.innerHTML='';
-    const img = new Image();
-    img.onload = ()=>{
-      const w = img.naturalWidth;
-      const h = img.naturalHeight;
-      svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
-      svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-      svg.style.width='100%';
-      svg.style.height='100%';
+    return new Promise((resolve)=>{
+      svgBox.innerHTML='';
+      const img = new Image();
+      img.onload = ()=>{
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+        svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+        svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+        svg.style.width='100%';
+        svg.style.height='100%';
 
-      contentLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
-      const imgEl = document.createElementNS('http://www.w3.org/2000/svg','image');
-      imgEl.setAttribute('href', url);
-      imgEl.setAttribute('width', w);
-      imgEl.setAttribute('height', h);
-      contentLayer.appendChild(imgEl);
-      svg.appendChild(contentLayer);
+        contentLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
+        const imgEl = document.createElementNS('http://www.w3.org/2000/svg','image');
+        imgEl.setAttribute('href', url);
+        imgEl.setAttribute('width', w);
+        imgEl.setAttribute('height', h);
+        contentLayer.appendChild(imgEl);
+        svg.appendChild(contentLayer);
 
-      gridLayer = document.createElementNS('http://www.w3.org/2000/svg','g'); gridLayer.id='grid-layer'; svg.appendChild(gridLayer);
-      tokensLayer = document.createElementNS('http://www.w3.org/2000/svg','g'); tokensLayer.id='tokens-layer'; svg.appendChild(tokensLayer);
-      svg.insertBefore(gridLayer, tokensLayer);
+        gridLayer = document.createElementNS('http://www.w3.org/2000/svg','g'); gridLayer.id='grid-layer'; svg.appendChild(gridLayer);
+        tokensLayer = document.createElementNS('http://www.w3.org/2000/svg','g'); tokensLayer.id='tokens-layer'; svg.appendChild(tokensLayer);
+        svg.insertBefore(gridLayer, tokensLayer);
 
-      state.baseVB = {x:0, y:0, w:w, h:h};
-      setViewBox(0,0,w,h);
+        state.baseVB = {x:0, y:0, w:w, h:h};
+        setViewBox(0,0,w,h);
 
-      drawGrid();
-      enableInputHandlers();
-      svgBox.appendChild(svg);
+        drawGrid();
+        enableInputHandlers();
+        svgBox.appendChild(svg);
 
-      rebuildLayersPanel();
-    };
-    img.src = url;
+        rebuildLayersPanel();
+        resolve();
+      };
+      img.src = url;
+    });
   }
 
   function ensureViewBox(s){ if(!s.getAttribute('viewBox')){ const w=parseFloat(s.getAttribute('width'))||1000; const h=parseFloat(s.getAttribute('height'))||1000; s.setAttribute('viewBox',`0 0 ${w} ${h}`); } }
@@ -614,31 +628,41 @@
   }
 
   // === Save/Load ===
-  btnSave.onclick = ()=>{
-    if (!svg) return;
+  function getState(){
     const vb = svg.viewBox.baseVal;
-    const data = {
-      cell: state.cell, angle: state.angle, alpha: state.alpha, gridColor: state.gridColor, showGrid: state.showGrid,
-      tokenSizeCells: state.tokenSizeCells, tokenColor: state.tokenColor,
+    return {
+      cell: state.cell,
+      angle: state.angle,
+      alpha: state.alpha,
+      gridColor: state.gridColor,
+      showGrid: state.showGrid,
+      tokenSizeCells: state.tokenSizeCells,
+      tokenColor: state.tokenColor,
       viewBox: {x: vb.x, y: vb.y, w: vb.width, h: vb.height},
       baseVB: state.baseVB,
-        tokens: Array.from(tokensLayer.querySelectorAll('.token')).map(t=>({
-          t: getTranslate(t),
-          label: t.querySelector('.label').textContent,
-          id: t.dataset.id,
-          locked: t.dataset.locked === 'true',
-          hidden: t.dataset.hidden === 'true',
-          color: t.dataset.color
-        }))
-      };
-    localStorage.setItem('vtt_tokens_v5_layers', JSON.stringify(data));
-    alert('Сохранено');
-  };
+      bg: state.bg,
+      tokens: Array.from(tokensLayer?.querySelectorAll('.token')||[]).map(t=>({
+        t: getTranslate(t),
+        label: t.querySelector('.label').textContent,
+        id: t.dataset.id,
+        locked: t.dataset.locked === 'true',
+        hidden: t.dataset.hidden === 'true',
+        color: t.dataset.color
+      }))
+    };
+  }
 
-  btnLoad.onclick = ()=>{
-    const raw = localStorage.getItem('vtt_tokens_v5_layers'); 
-    if (!raw) return;
-    const st = JSON.parse(raw);
+  function saveToLocal(){
+    if(!svg || !state.bg) return;
+    localStorage.setItem(LS_KEY, JSON.stringify(getState()));
+  }
+
+  async function applyState(st){
+    if(st.bg){
+      if(st.bg.type==='svg') await mountSVG(st.bg.data);
+      else if(st.bg.type==='image') await mountImage(st.bg.data);
+    }
+    state.bg = st.bg || null;
     state.cell = st.cell ?? state.cell; cellInput.value = state.cell;
     state.angle = st.angle ?? state.angle; angleInput.value = state.angle;
     state.alpha = st.alpha ?? state.alpha; alphaInput.value = state.alpha;
@@ -648,13 +672,14 @@
     state.tokenColor = st.tokenColor ?? state.tokenColor; tokenColorInput.value = state.tokenColor;
     state.baseVB = st.baseVB ?? state.baseVB;
     drawGrid();
+    applyGridTransform();
+    applyGridStyle(true);
     if (st.viewBox) setViewBox(st.viewBox.x, st.viewBox.y, st.viewBox.w, st.viewBox.h);
 
     tokensLayer.innerHTML='';
     layersList.innerHTML='';
     tokenSeq = 0;
-
-      for (const it of (st.tokens||[])){
+    for (const it of (st.tokens||[])){
       const g = createToken({ x: it.t.x, y: it.t.y, label: it.label });
       if (it.id){ g.dataset.id = it.id; const n = parseInt(it.id.slice(1),10); if(Number.isFinite(n)) tokenSeq = Math.max(tokenSeq, n); }
       g.dataset.color = it.color || state.tokenColor;
@@ -663,7 +688,6 @@
       setTokenVisible(g, !it.hidden);
       tokensLayer.appendChild(g);
       registerTokenInLayers(g);
-      // sync кнопок
       const row = layersList.querySelector(`.layer-row[data-id="${g.dataset.id}"]`);
       if (row){
         row.querySelector('.iconbtn:nth-child(1)').dataset.on = (!it.hidden) ? 'true' : 'false';
@@ -673,9 +697,42 @@
         if (cInp) cInp.value = g.dataset.color;
       }
     }
-      refreshTokenCount();
-      alert('Загружено');
-    };
+    refreshTokenCount();
+  }
+
+  async function loadFromLocal(){
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return;
+    const st = JSON.parse(raw);
+    await applyState(st);
+  }
+
+  btnSave.onclick = ()=>{
+    if(!svg || !state.bg) return;
+    const data = getState();
+    const blob = new Blob([JSON.stringify(data)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'map-state.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  btnLoad.onclick = ()=>{ stateFileInput.click(); };
+  stateFileInput.onchange = async e=>{
+    const f=e.target.files?.[0];
+    if(f){
+      try{
+        const st = JSON.parse(await f.text());
+        await applyState(st);
+        saveToLocal();
+      }catch(err){ console.error(err); }
+    }
+    e.target.value='';
+  };
+
+  loadFromLocal();
+  window.addEventListener('beforeunload', saveToLocal);
 
   // === Utils ===
   function toInt(v,def=0){ const n=parseInt(v,10); return Number.isFinite(n)?n:def; }
