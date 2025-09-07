@@ -130,9 +130,9 @@
   snapInput.onchange=()=>{ state.snap = snapInput.checked; };
 
     tokenSizeInput.oninput=()=>{ state.tokenSizeCells = Math.max(0.1, toFloat(tokenSizeInput.value,1)); updateAllTokensStyle(); };
-    tokenColorInput.oninput=()=>{
-      state.tokenColor = tokenColorInput.value;
-    };
+    const handleTokenColorChange = () => { state.tokenColor = tokenColorInput.value; };
+    tokenColorInput.addEventListener('input', handleTokenColorChange);
+    tokenColorInput.addEventListener('change', handleTokenColorChange);
 
   // корректный зум
   zoomInBtn.onclick = ()=> zoomAt(null, 0.85);
@@ -304,9 +304,9 @@
         lock.dataset.on = on ? 'false' : 'true';
         setTokenLocked(g, !on ? true : false);
       };
-      clr.oninput = ()=>{
-        setTokenColor(g, clr.value);
-      };
+      const handleRowColor = ()=> setTokenColor(g, clr.value);
+      clr.addEventListener('input', handleRowColor);
+      clr.addEventListener('change', handleRowColor);
       name.oninput = ()=>{
         g.querySelector('.label').textContent = name.value || '';
       };
@@ -373,7 +373,7 @@
         picker.style.left = '-1000px';
         document.body.appendChild(picker);
         picker.addEventListener('input', ()=> setTokenColor(tokenEl, picker.value));
-        picker.addEventListener('change', ()=> picker.remove());
+        picker.addEventListener('change', ()=>{ setTokenColor(tokenEl, picker.value); picker.remove(); });
         dragging = null;
         picker.click();
       }
