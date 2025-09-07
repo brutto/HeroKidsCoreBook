@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hero Kids — Шахты Мартек: интерактивный перевод</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="header">
+    <h1>Hero Kids — Mines of Martek · Интерактивный перевод</h1>
+    <div class="controls">
+      <button id="prevBtn" title="Предыдущая страница (←)">←</button>
+      <label>Стр. <input id="pageInput" type="number" min="1" max="24" value="1" /> из <span id="totalPages">24</span></label>
+      <button id="nextBtn" title="Следующая страница (→)">→</button>
+      <button id="resetBtn" title="Очистить перевод текущей страницы">Очистить</button>
+      <button id="exportBtn" title="Экспортировать все переводы в .json">Экспорт</button>
+      <input id="importFile" type="file" accept="application/json" hidden />
+      <button id="importBtn" title="Импортировать переводы из .json">Импорт</button>
+    </div>
+  </header>
+
+  <main class="split">
+    <section class="pane translation">
+      <div class="pane-header">
+        <h2>Перевод</h2>
+        <small>Текст сохраняется в браузере (localStorage) по страницам.</small>
+      </div>
+      <div id="editor" class="editor" contenteditable="true" spellcheck="true" aria-label="Поле перевода"></div>
+    </section>
+
+    <section class="pane original">
+      <div class="pane-header">
+        <h2>Оригинал (PDF)</h2>
+        <small>Кликните для полноэкранного просмотра.</small>
+      </div>
+      <div class="pdf-wrap" id="pdfWrap" title="Открыть на весь экран">
+        <!-- We deliberately use an <iframe> to keep it offline-friendly -->
+        <iframe id="pdfFrame" src="assets/mines-of-martek.pdf#page=1&zoom=page-fit" loading="lazy"></iframe>
+        <div class="pdf-overlay">Нажмите для увеличения ⤢</div>
+      </div>
+    </section>
+  </main>
+
+  <div id="lightbox" class="lightbox" aria-hidden="true">
+    <button class="close" id="closeLightbox" title="Закрыть (Esc)">✕</button>
+    <iframe id="pdfFull" src="" loading="lazy"></iframe>
+  </div>
+
+  <footer class="footer">
+     <span>Скелет интерфейса для перевода. Горячие клавиши: ←/→ для навигации, Ctrl/Cmd+S — сохранить на всякий случай (данные и так сохраняются автоматически).</span>
+  </footer>
+
+  <script>
+    window.__APP_CONFIG__ = {
+      pdfPath: "assets/mines-of-martek.pdf",
+      totalPages: 24,
+      storageKey: "martek-ru-v1"
+    };
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>

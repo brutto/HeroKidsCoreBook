@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hero Kids — Карточка героя (базовый модульный каркас)</title>
+<style>
+  :root{ --bg:#0b0c10; --paper:#0f1218; --text:#e6eef8; --muted:#a8b2c1; --border:#20242c; --accent:#66fcf1 }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+  a{color:var(--accent)}
+  .wrap{max-width:960px; margin:0 auto; padding:16px}
+  header{display:flex; align-items:center; justify-content:space-between; gap:12px}
+  .btn{cursor:pointer; background:var(--accent); color:#072b28; border:none; padding:8px 12px; border-radius:10px; font-weight:700}
+  .btn.ghost{background:transparent; color:var(--accent); border:1px solid var(--accent)}
+  .muted{color:var(--muted)}
+  .panel{margin-top:12px; background:#0f1218; border:1px solid var(--border); border-radius:14px; overflow:hidden}
+  .panel-hd{padding:10px 14px; border-bottom:1px solid var(--border); display:flex; gap:12px; align-items:center}
+  .panel-bd{padding:14px}
+
+  /* Карточка-обёртка, в которую модули вставляют свой UI */
+
+  /* по умолчанию любой модуль занимает всю ширину */
+  .card-shell {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: 1fr;        /* по умолчанию один столбец */
+  }
+  .module{
+    background:#0b0c10; 
+    border:1px dashed #2a313c; 
+    border-radius:12px; 
+    padding:12px;
+    grid-column: 1 / -1;
+  }
+  .module > .mod-hd{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px}
+  .module h3{margin:0; font-size:14px; color:var(--muted)}
+  .module .mod-bd{font-size:14px}
+  .row{display:flex; gap:8px; flex-wrap:wrap}
+  input[type="text"], .input{background:#0b0c10; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:8px 10px}
+
+  .flex-spacer { flex: 1; }
+
+  @media (min-width: 720px) {
+    .card-shell {
+      grid-template-columns: 1fr 1fr;  /* две колонки */
+    }
+    .module.half {
+      grid-column: auto;               /* занимает одну колонку */
+    }
+    /* остальные модули продолжают тянуться на всю ширину:
+      .module (без .half) остаётся grid-column: 1 / -1; */
+  }
+
+.btn.danger {
+  --danger:#ff5f5f;
+  border-color: var(--danger);
+  color: var(--danger);
+  opacity: 0.65;
+}
+.btn.danger.ghost { background: transparent; }
+.btn.danger:hover { background: #2a0f12; }
+
+  /* Health pips styled like Stats pips, but with hearts */
+
+  /* компактная группа пипсов, без растягивания */
+.health-wrap { display: flex; justify-content: flex-start; }
+.health-wrap .pips { display: flex; gap: 6px; width: max-content; }
+
+/* по умолчанию сердечки «горит» (on); пустые — класс .off */
+.pip.heart {
+  width: 35px; height: 35px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  display: grid; place-items: center;
+  cursor: pointer;
+  color: #072b28;                     /* контур сердечка на светлом акценте */
+  transition: transform .08s ease-out, background .15s, border-color .15s, color .15s;
+}
+.pip.heart.off {
+  background: #0f1218;
+  border-color: #2a313c;
+  color: #7f8aa3;                     /* тусклый контур сердечка */
+}
+.pip.heart:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* «теряешь сердечко» — та же анимация, что при переполнении навыков */
+.pip.heart.shake { animation: shake .4s; border-color: #ff5555; }
+@keyframes shake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-6px); }
+  40%, 60% { transform: translateX(6px); }
+}
+
+  /* Inventory module UI */
+.inv-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+.inv-cell {
+  min-height: 48px;
+  border: 1px dashed #2a313c;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  color: var(--muted);
+  position: relative;
+  user-select: none;
+}
+.inv-cell.filled {
+  border-style: solid;
+  color: var(--text);
+}
+.inv-chip {
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inv-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: none;
+  background: #00000099;
+  color: #fff;
+  line-height: 20px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+@media (max-width: 520px) {
+  .inv-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* Background module */
+.bg-dropzone {
+  border: 1px dashed #2a313c;
+  border-radius: 12px;
+  padding: 10px;
+  background: #0b0c10;
+  cursor: pointer;
+}
+.bg-dropzone.dragover { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.bg-preview {
+  position: relative;
+  height: 240px;
+  border-radius: 10px;
+  background-color: #0f1218;
+  overflow: hidden;
+}
+
+/* Рисуем картинку отдельным тегом, управляем прозрачностью и режимом вписывания */
+.bg-preview-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: var(--bg-fit, contain);
+  opacity: var(--bg-opacity, 1);
+  pointer-events: none;
+}
+
+.bg-hint {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  color: var(--muted); font-size: 13px;
+  pointer-events: none;
+}
+
+.bg-preview.has-image .bg-hint { display: none; }
+
+/* Stats module */
+.stats-wrap { display: grid; gap: 10px; }
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0b0c10;
+}
+
+.stat-left { display: flex; align-items: center; gap: 8px; min-width: 160px; }
+.stat-icon { width: 22px; height: 22px; color: var(--muted); display: grid; place-items: center; }
+.stat-label { font-weight: 600; }
+
+.stat-right { display: flex; align-items: center; gap: 10px; }
+.pips { display: grid; grid-auto-flow: column; gap: 6px; }
+
+.pip {
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  border: 1px solid #2a313c;
+  background: #0f1218;
+  cursor: pointer;
+}
+.pip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.pip:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.stat-value { color: var(--muted); font-size: 13px; min-width: 36px; text-align: right; }
+
+/* Skill module */
+.skills-wrap { display: grid; gap: 10px; }
+
+.skill-item {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0b0c10;
+  cursor: pointer;
+  transition: background .2s, border-color .2s;
+}
+.skill-item:hover { border-color: var(--accent); }
+.skill-item.on { background: #0f2626; border-color: var(--accent); }
+
+.skill-icon { flex-shrink: 0; width: 28px; height: 28px; color: var(--accent); display: grid; place-items: center; }
+.skill-body { display: flex; flex-direction: column; }
+.skill-name { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+.skill-desc { font-size: 13px; color: var(--muted); line-height: 1.4; }
+
+.skill-item.shake { animation: shake .4s; border-color: #ff5555; }
+@keyframes shake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-6px); }
+  40%, 60% { transform: translateX(6px); }
+}
+
+/* Контейнер выбранных навыков */
+.skills-selected { display: grid; gap: 10px; }
+
+/* Элемент навыка (как раньше) */
+.skill-item {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0b0c10;
+  cursor: pointer;
+  color: #e6eef8;
+  transition: background .2s, border-color .2s, transform .12s;
+}
+.skill-item:hover { border-color: var(--accent); }
+.skill-item.on { background: #0f2626; border-color: var(--accent); }
+
+.skill-icon { flex-shrink: 0; width: 28px; height: 28px; color: var(--accent); display: grid; place-items: center; }
+.skill-body { display: flex; flex-direction: column; text-align: left; }
+.skill-name { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+.skill-desc { font-size: 13px; color: var(--muted); line-height: 1.4; }
+
+/* Поповер-пикер */
+.skills-popover {
+  position: relative;
+  margin-top: 8px;
+}
+.skills-popover[hidden] { display: none; }
+.skills-popover {
+  position: relative;   /* поповер теперь привязан к блоку модуля */
+  margin-top: 8px;
+}
+.skills-popover[hidden] { display: none; }
+
+.skills-popover-content {
+  position: absolute;
+  z-index: 30;
+  top: 0;
+  left: 0;
+  right: 0;        /* растягиваем по ширине контейнера */
+  width: 100%;     /* ровно как ширина блока навыков */
+  max-height: 320px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #0b0c10;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45);
+}
+
+/* Кнопки в поповере выглядят так же, как выбранные элементы */
+.skill-item.as-option { width: 100%; text-align: left; }
+.skill-empty { padding: 6px 4px; }
+
+/* Анимации */
+.skill-item.shake { animation: shake .4s; border-color: #ff5555; }
+@keyframes shake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-6px); }
+  40%, 60% { transform: translateX(6px); }
+}
+
+/* Пульс (когда превысили лимит) */
+.pulse { animation: pulse 0.6s; }
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(102,252,241,0.6); }
+  70%{ box-shadow: 0 0 0 10px rgba(102,252,241,0); }
+  100%{ box-shadow: 0 0 0 0 rgba(102,252,241,0); }
+}
+
+/* оформление класса */
+.class-wrap { display: grid; gap: 8px; }
+.class-card {
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; background: #0b0c10;
+}
+.class-icon { width: 36px; height: 36px; color: var(--accent); display: grid; place-items: center; }
+.class-name { font-weight: 700; }
+.class-custom .input { width: 100%; }
+
+/* Карточка текущего класса — как кнопка-переключатель */
+.class-wrap { display: grid; gap: 8px; }
+.class-card.as-toggle {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #0b0c10;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .2s, background .2s, transform .12s;
+}
+.class-card.as-toggle:hover { border-color: var(--accent); }
+.class-icon { width: 36px; height: 36px; color: var(--accent); display: grid; place-items: center; }
+.class-name { font-weight: 700; color: #e6eef8;}
+
+/* Поповер — по ширине блока модуля */
+.class-popover { position: relative; }
+.class-popover[hidden] { display: none; }
+.class-popover-content {
+  position: absolute;
+  z-index: 30;
+  top: 6px;    /* небольшое смещение вниз от карточки */
+  left: 0;
+  right: 0;
+  width: 100%;
+  max-height: 320px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #0b0c10;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45);
+}
+
+/* Опции внутри выпадашки */
+.class-option {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0b0c10;
+  cursor: pointer;
+  text-align: left;
+  transition: background .2s, border-color .2s;
+}
+.class-option + .class-option { margin-top: 6px; }
+.class-option:hover { border-color: var(--accent); }
+.class-option-icon { width: 32px; height: 32px; color: var(--accent); display: grid; place-items: center; }
+.class-option-name { font-weight: 600; color: #e6eef8;}
+.class-option-check { color: var(--accent); font-weight: 800; }
+
+/* Ряд для «Свой класс…» */
+.class-custom .input { width: 100%; }
+
+</style>
+<script type="module" src="./main.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 style="margin:0">Hero Kids — модульная карточка (база)</h1>
+    <div class="row">
+      <button class="btn" id="btnNew">Новая карточка</button>
+      <button class="btn ghost" id="btnExport">Экспорт JSON</button>
+      <button class="btn ghost" id="btnImport">Импорт JSON</button>
+    </div>
+  </header>
+  <p class="muted" style="margin:.25rem 0 0">Это минимальный каркас: хранение, события, реестр модулей и два простых модуля-примера. Далее будем наращивать (здоровье, инвентарь и т.д.).</p>
+
+  <div class="panel">
+    <div class="panel-hd">
+      <label class="row" style="align-items:center; gap:10px">
+        <span class="muted">Слот сохранения:</span>
+        <select id="slot" class="input"></select>
+      </label>
+
+      <div class="flex-spacer"></div> <!-- 👈 раздвигает элементы -->
+
+      <button class="btn danger ghost" id="btnDeleteSlot" title="Удалить текущего героя">Удалить героя</button>
+    </div>
+    <div class="panel-bd">
+      <div id="card" class="card-shell"></div>
+    </div>
+  </div>
+</div>
+<!-- БАЗОВАЯ ПЛАТФОРМА -->
+<script type="module">
+/********************
+ * 1) Лёгкий PubSub  *
+ ********************/
+export class Bus {
+  constructor(){ this.map = new Map(); }
+  on(evt, fn){ (this.map.get(evt) || this.map.set(evt,[]).get(evt)).push(fn); return ()=>this.off(evt, fn); }
+  off(evt, fn){ const arr=this.map.get(evt)||[]; const i=arr.indexOf(fn); if(i>=0) arr.splice(i,1); }
+  emit(evt, payload){ (this.map.get(evt)||[]).forEach(fn=>fn(payload)); }
+}
+
+/********************
+ * 2) Хранилище      *
+ ********************/
+// store.js
+export class Store {
+  constructor(key = 'hero-kids:card:v2') {
+    this.key = key;
+    const loaded = this._load();
+    this.state = loaded || this._migrateFromV1('hero-kids:card:v1') || this._defaultState();
+    this._save();
+  }
+
+  /* ====== ВНУТРЕННЕЕ ====== */
+  _defaultState() {
+    const id = this._genId();
+    return { version: 2, slots: { [id]: { id, name: 'Герой #1', modules: {} } }, active: id };
+  }
+  _load() { try { return JSON.parse(localStorage.getItem(this.key)); } catch { return null; } }
+  _save() { localStorage.setItem(this.key, JSON.stringify(this.state)); }
+  _genId() { return 'slot-' + Math.random().toString(36).slice(2,6) + Date.now().toString(36).slice(-4); }
+  _migrateFromV1(v1key) {
+    try {
+      const raw = localStorage.getItem(v1key); if (!raw) return null;
+      const v1 = JSON.parse(raw); if (!v1?.slots || !v1?.active) return null;
+      const v2 = { version: 2, slots: {}, active: '' };
+      for (const name of Object.keys(v1.slots)) {
+        const id = this._genId();
+        const old = v1.slots[name] || {};
+        v2.slots[id] = { id, name: old.name || name, modules: old.modules || {} };
+      }
+      v2.active = Object.values(v2.slots).find(s => s.name === v1.active)?.id || Object.keys(v2.slots)[0];
+      localStorage.setItem(this.key, JSON.stringify(v2));
+      return v2;
+    } catch { return null; }
+  }
+
+  /* ====== ПУБЛИЧНОЕ ДЛЯ ПРИЛОЖЕНИЯ/МОДУЛЕЙ ====== */
+  get activeId() { return this.state.active; }
+  set activeId(id) { if (this.state.slots[id]) { this.state.active = id; this._save(); } }
+
+  listSlots() { return Object.values(this.state.slots).map(({id,name}) => ({id,name})); }
+  activeSlot() { return this.state.slots[this.state.active]; }
+
+  createSlot(name = '') {
+    const id = this._genId();
+    this.state.slots[id] = { id, name: name || 'Новый герой', modules: {} };
+    this.state.active = id; this._save(); return id;
+  }
+  renameSlot(id, newName) {
+    const s = this.state.slots[id]; if (!s) return;
+    s.name = (newName || '').trim() || s.name; this._save();
+  }
+  deleteSlot(id) {
+    if (!this.state.slots[id]) return false;
+    const wasActive = this.state.active === id;
+    delete this.state.slots[id];
+    if (wasActive) this.state.active = Object.keys(this.state.slots)[0] || '';
+    this._save(); return true;
+  }
+
+  /** Получить состояние модуля, создав по умолчанию */
+  getModule(modId, defaults = {}) {
+    const s = this.activeSlot();
+    if (!s.modules[modId]) s.modules[modId] = structuredClone(defaults);
+    return s.modules[modId];
+  }
+  /** Заменить состояние модуля целиком */
+  setModule(modId, nextState) {
+    const s = this.activeSlot();
+    s.modules[modId] = structuredClone(nextState);
+    this._save();
+  }
+  /** Частично обновить состояние модуля */
+  patchModule(modId, patch) {
+    const cur = this.getModule(modId, {});
+    Object.assign(cur, patch);
+    this._save();
+  }
+}
+
+/********************
+ * 3) Реестр модулей *
+ ********************/
+export class ModuleRegistry{
+  constructor(bus, store){ this.bus=bus; this.store=store; this.items=[]; }
+  use(mod){ this.items.push(mod); }
+  mountAll(container){
+    container.innerHTML='';
+    for(const mod of this.items){
+      const el = document.createElement('section');
+      el.className = 'module' + (mod.layout ? ` ${mod.layout}` : '');
+      el.dataset.mod = mod.id;
+      el.innerHTML = `<div class="mod-hd"><h3>${mod.title}</h3><div class="row">${mod.headerActions?.()||''}</div></div><div class="mod-bd"></div>`;
+      container.appendChild(el);
+      mod.mount({ el: el.querySelector('.mod-bd'), shell: el, bus:this.bus, store:this.store });
+    }
+  }
+  forEach(fn){ this.items.forEach(fn); }
+}
+
+/************************
+ * 4) Инициализация App  *
+ ************************/
+import { NameModule } from './name-module.js';
+import { NotesModule } from './notes-module.js';
+import { HealthModule } from './health-module.js';
+import { InventoryModule } from './inventory-module.js';
+import { BackgroundModule } from './background-module.js';
+import { StatsModule } from './stats-module.js';
+import { SkillModule } from './skills-module.js';
+import { ClassModule } from './class-module.js';
+
+const bus   = new Bus();
+const store = new Store('hero-kids:card:v1');
+const reg   = new ModuleRegistry(bus, store);
+
+// Регистрируем стартовые модули (их код ниже как inline-модули)
+const nameMod = new NameModule();
+nameMod.layout = 'half'; 
+
+const healthMod = new HealthModule();
+healthMod.layout = 'half'; 
+
+const statMod = new StatsModule();
+statMod.layout = 'half'; 
+
+reg.use(nameMod);
+reg.use(new ClassModule());
+reg.use(healthMod);
+reg.use(statMod);
+reg.use(new InventoryModule()); 
+reg.use(new SkillModule());
+reg.use(new BackgroundModule());
+reg.use(new NotesModule());
+
+// UI верхней панели: список слотов
+// рендер списка слотов (value = скрытый id, текст = видимое имя)
+const slotSel = document.getElementById('slot');
+function refreshSlots() {
+  slotSel.innerHTML = '';
+  for (const { id, name } of store.listSlots()) {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = name;
+    slotSel.appendChild(opt);
+  }
+  slotSel.value = store.activeId;
+  updateDeleteBtnState();
+}
+
+// получить ссылку на кнопку удаления
+const btnDeleteSlot = document.getElementById('btnDeleteSlot');
+
+// включать/выключать кнопку в зависимости от кол-ва слотов
+function updateDeleteBtnState() {
+  const count = store.listSlots().length;
+  btnDeleteSlot.disabled = count <= 1; // не даём удалить последнего
+  btnDeleteSlot.title = count <= 1
+    ? 'Нельзя удалить последнего героя. Сначала создайте нового.'
+    : 'Удалить текущего героя';
+}
+
+// 🔔 автообновление при переименовании из NameModule
+bus.on('slot:renamed', () => {
+  const cur = store.activeId;
+  refreshSlots();
+  slotSel.value = cur; // сохраняем выделение
+});
+
+// (по желанию) автообновление при создании/удалении
+bus.on('slot:created', () => refreshSlots());
+bus.on('slot:deleted', () => {
+  refreshSlots();
+  mount(); // если активный удалён — перерисуем модули
+});
+
+// само удаление с подтверждением
+btnDeleteSlot.addEventListener('click', () => {
+  const cur = store.activeSlot();
+  if (!cur) return;
+
+  // защитимся от удаления единственного слота (на случай прямого вызова)
+  if (store.listSlots().length <= 1) {
+    alert('Нельзя удалить последнего героя. Сначала создайте нового.');
+    return;
+  }
+
+  const ok = confirm(`Удалить героя «${cur.name}» навсегда? Это действие нельзя отменить.`);
+  if (!ok) return;
+
+  // удаляем и переводим активность на следующий доступный слот
+  const deletedId = cur.id;
+  const success = store.deleteSlot(deletedId);
+  if (success) {
+    bus.emit('slot:deleted', deletedId);
+    refreshSlots();
+    mount(); // перерисовать модули под новый активный слот
+  }
+});
+
+// полезно также обновлять состояние при событиях:
+bus.on('slot:created', updateDeleteBtnState);
+bus.on('slot:deleted', updateDeleteBtnState);
+bus.on('slot:renamed', updateDeleteBtnState);
+
+refreshSlots();
+
+slotSel.addEventListener('change', () => {
+  store.activeId = slotSel.value;
+  mount(); // перерисовать модули
+});
+
+// «Новая карточка»
+document.getElementById('btnNew').addEventListener('click', () => {
+  const name = prompt('Имя нового героя:', `Герой #${store.listSlots().length + 1}`) || '';
+  store.createSlot(name.trim());
+  refreshSlots();
+  mount();
+});
+
+// (необязательно) Кнопка «Переименовать»
+document.getElementById('btnRename')?.addEventListener('click', () => {
+  const cur = store.activeSlot();
+  const name = prompt('Новое имя героя:', cur.name);
+  if (name != null) {
+    store.renameSlot(cur.id, name.trim());
+    refreshSlots();
+  }
+});
+
+// Экспорт/импорт — без изменений, только теперь активный слот берём по id
+document.getElementById('btnExport').addEventListener('click', () => {
+  const data = JSON.stringify(store.activeSlot(), null, 2);
+  const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${store.activeSlot().name}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+});
+
+document.getElementById('btnImport').addEventListener('click', () => {
+  const inp = Object.assign(document.createElement('input'), { type: 'file', accept: 'application/json' });
+  inp.onchange = () => {
+    const f = inp.files?.[0]; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      try {
+        const obj = JSON.parse(rd.result);
+        // ожидаем формат слота v2: { id?, name, modules }
+        const id = store.createSlot(obj.name || `Герой #${store.listSlots().length + 1}`);
+        // сольём modules, если есть
+        const s = store.ensure(id);
+        s.modules = obj.modules || {};
+        store._save();
+        refreshSlots(); mount();
+      } catch {
+        alert('Не удалось импортировать JSON');
+      }
+    };
+    rd.readAsText(f);
+  };
+  inp.click();
+});
+
+function mount(){ reg.mountAll(document.getElementById('card')); }
+mount();
+
+/*************************************************
+ * Ниже идут "inline-модули" — их можно вынести в
+ * отдельные файлы без изменения API.            *
+ *************************************************/
+</script>
+
+</body>
+</html>

@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SVG VTT — слои, заморозка и видимость токенов</title>
+  <style>
+    :root{
+      --bg:#0b0c10; --paper:#0f1218; --text:#e6eef8; --muted:#a8b2c1; --border:#20242c; --accent:#66fcf1;
+      --token:#ffd166; --token-stroke:#333; --token-shadow: drop-shadow(0 2px 4px rgba(0,0,0,.4));
+      --grid:#66fcf1;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;overflow:hidden}
+
+    .toolbar{position:fixed;top:0;left:0;right:0;z-index:10;background:linear-gradient(180deg,var(--bg),#0b0c10EE);border-bottom:1px solid var(--border);padding:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .btn{background:var(--paper);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:4px 10px;cursor:pointer}
+    .btn:hover{border-color:#2a303a}
+    .num{width:72px}
+
+    /* Холст и боковая панель слоёв */
+    #host{position:absolute;top:48px;bottom:0;left:0;right:280px;background:var(--paper);overflow:hidden}
+    #layers{position:absolute;top:48px;bottom:0;right:0;width:280px;border-left:1px solid var(--border);background:linear-gradient(180deg,var(--paper),#0f1218);overflow:auto}
+    #layers .head{position:sticky;top:0;background:linear-gradient(180deg,#0f1218,#0f1218F0);padding:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+    #layers .head .title{font-weight:700}
+    #layers .list{padding:8px;display:flex;flex-direction:column;gap:6px}
+    .layer-row{display:grid;grid-template-columns: 24px 24px 1fr;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;padding:6px 8px;background:#0e1218}
+    .layer-row input[type="text"]{width:100%;background:transparent;border:1px solid #222a33;border-radius:6px;padding:4px 6px;color:var(--text)}
+    .iconbtn{appearance:none;width:20px;height:20px;border:1px solid #29303a;border-radius:6px;background:#121720;display:grid;place-items:center;cursor:pointer}
+    .iconbtn[data-on="true"]{border-color:#355;color:var(--accent)}
+    .small{font-size:12px;color:var(--muted)}
+
+    svg{user-select:none;touch-action:none}
+    .dropzone{display:flex;align-items:center;justify-content:center;min-height:180px;border:2px dashed #2b313a;border-radius:12px;color:var(--muted);margin:12px;background:#0f1218;cursor:pointer}
+
+    .token{filter:var(--token-shadow);cursor:grab;user-select:none}
+    .token:active{cursor:grabbing}
+    .token.locked{cursor:not-allowed}
+    .token .chip{fill:var(--token);stroke:var(--token-stroke);stroke-width:2}
+    .token.locked .chip{stroke-dasharray:3 3}
+    .token .label{font:700 12px/1 sans-serif;text-anchor:middle;dominant-baseline:central;fill:#222}
+  </style>
+</head>
+<body>
+<div class="toolbar">
+  <label class="btn">Загрузить SVG<input id="file" type="file" accept=".svg" hidden></label>
+  <label>Клетка: <input id="cell" class="num" type="number" min="4" step="1" value="32"></label>
+  <label>Поворот: <input id="angle" class="num" type="number" step="1" value="0">°</label>
+  <label>Прозрачность: <input id="alpha" type="range" min="0" max="1" step="0.05" value="0.35"></label>
+  <label>Цвет сетки: <input id="color" type="color" value="#66fcf1"></label>
+  <label><input id="showGrid" type="checkbox" checked> Сетка</label>
+  <label><input id="snap" type="checkbox" checked> Привязка (к центрам)</label>
+
+  <span style="width:1px;height:24px;background:var(--border);"></span>
+  <label>Размер фишек (в клетках): <input id="tokenSize" class="num" type="number" min="0.25" step="0.1" value="1"></label>
+  <label>Цвет фишек: <input id="tokenColor" type="color" value="#ffd166"></label>
+
+  <span style="width:1px;height:24px;background:var(--border);"></span>
+  <button id="zoomOut" class="btn" title="Уменьшить">−</button>
+  <button id="zoomIn"  class="btn" title="Увеличить">+</button>
+  <button id="zoomReset" class="btn" title="Сброс">Reset</button>
+
+  <button id="btnAdd" class="btn">Фишка</button>
+  <button id="btnSave" class="btn">Сохранить</button>
+  <button id="btnLoad" class="btn">Загрузить</button>
+</div>
+
+<div id="host">
+  <div id="svgBox">
+    <label for="file" class="dropzone" id="drop">Перетащите сюда Watabou SVG</label>
+  </div>
+</div>
+
+<!-- Панель слоёв -->
+<aside id="layers" aria-label="Слои/токены">
+  <div class="head">
+    <span class="title">Слои токенов</span>
+    <span class="small" id="tokenCount"></span>
+  </div>
+  <div class="list" id="layersList"></div>
+</aside>
+
+<script>
+(function(){
+  const fileInput = document.getElementById('file');
+  const drop = document.getElementById('drop');
+  const svgBox = document.getElementById('svgBox');
+  const btnAdd = document.getElementById('btnAdd');
+  const btnSave = document.getElementById('btnSave');
+  const btnLoad = document.getElementById('btnLoad');
+  const cellInput = document.getElementById('cell');
+  const angleInput = document.getElementById('angle');
+  const alphaInput = document.getElementById('alpha');
+  const showGridInput = document.getElementById('showGrid');
+  const snapInput = document.getElementById('snap');
+  const colorInput = document.getElementById('color');
+  const tokenSizeInput = document.getElementById('tokenSize');
+  const tokenColorInput = document.getElementById('tokenColor');
+  const zoomInBtn = document.getElementById('zoomIn');
+  const zoomOutBtn = document.getElementById('zoomOut');
+  const zoomResetBtn = document.getElementById('zoomReset');
+
+  const layersList = document.getElementById('layersList');
+  const tokenCount = document.getElementById('tokenCount');
+
+  let svg=null, tokensLayer=null, gridLayer=null, contentLayer=null;
+  let dragging=null; let panning=null;
+  let tokenSeq=0; // для уникальных id
+
+  const state={
+    cell:32,
+    angle:0,
+    alpha:0.35,
+    gridColor:'#66fcf1',
+    snap:true,
+    showGrid:true,
+    tokenSizeCells:1.0,
+    tokenColor:'#ffd166',
+    baseVB:{x:0,y:0,w:1000,h:1000},
+  };
+
+  // === UI bindings ===
+  cellInput.oninput=()=>{ state.cell = toInt(cellInput.value,32); drawGrid(); updateAllTokensStyle(); };
+  angleInput.oninput=()=>{ state.angle = toFloat(angleInput.value,0); applyGridTransform(); };
+  alphaInput.oninput=()=>{ state.alpha = toFloat(alphaInput.value,0.35); applyGridStyle(); };
+  colorInput.oninput=()=>{ state.gridColor = colorInput.value; applyGridStyle(true); };
+  showGridInput.onchange=()=>{ state.showGrid = showGridInput.checked; if(gridLayer) gridLayer.style.display = state.showGrid?'':'none'; };
+  snapInput.onchange=()=>{ state.snap = snapInput.checked; };
+
+  tokenSizeInput.oninput=()=>{ state.tokenSizeCells = Math.max(0.1, toFloat(tokenSizeInput.value,1)); updateAllTokensStyle(); };
+  tokenColorInput.oninput=()=>{ state.tokenColor = tokenColorInput.value; updateAllTokensStyle(); };
+
+  // корректный зум
+  zoomInBtn.onclick = ()=> zoomAt(null, 0.85);
+  zoomOutBtn.onclick= ()=> zoomAt(null, 1/0.85);
+  zoomResetBtn.onclick= ()=> resetView();
+
+  // === Load SVG ===
+  fileInput.onchange = async (e)=>{ const f=e.target.files?.[0]; if(f) mountSVG(await f.text()); };
+  drop.ondragover = e=>{ e.preventDefault(); };
+  drop.ondrop = async e=>{ e.preventDefault(); const f=e.dataTransfer?.files?.[0]; if(f) mountSVG(await f.text()); };
+
+  function mountSVG(text){
+    svgBox.innerHTML='';
+    const tmp=document.createElement('div'); tmp.innerHTML=text.trim();
+    const found=tmp.querySelector('svg'); if(!found){ svgBox.textContent='SVG не найден'; return; }
+    svg = found;
+    ensureViewBox(svg);
+    const vb = svg.getAttribute('viewBox').trim().split(/\s+/).map(parseFloat);
+    state.baseVB = {x:vb[0], y:vb[1], w:vb[2], h:vb[3]};
+
+    svg.removeAttribute('width'); svg.removeAttribute('height'); svg.style.width='100%'; svg.style.height='100%';
+
+    contentLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
+    while(svg.firstChild) contentLayer.appendChild(svg.firstChild);
+    svg.appendChild(contentLayer);
+    gridLayer = document.createElementNS('http://www.w3.org/2000/svg','g'); gridLayer.id='grid-layer'; svg.appendChild(gridLayer);
+    tokensLayer = document.createElementNS('http://www.w3.org/2000/svg','g'); tokensLayer.id='tokens-layer'; svg.appendChild(tokensLayer);
+    svg.insertBefore(gridLayer, tokensLayer);
+
+    setViewBox(state.baseVB.x, state.baseVB.y, state.baseVB.w, state.baseVB.h);
+
+    drawGrid();
+    enableInputHandlers();
+    svgBox.appendChild(svg);
+
+    // пересчитать список слоёв (если svg перезагружен)
+    rebuildLayersPanel();
+  }
+
+  function ensureViewBox(s){ if(!s.getAttribute('viewBox')){ const w=parseFloat(s.getAttribute('width'))||1000; const h=parseFloat(s.getAttribute('height'))||1000; s.setAttribute('viewBox',`0 0 ${w} ${h}`); } }
+
+  // === Grid drawing ===
+  function drawGrid(){
+    if(!svg||!gridLayer) return;
+    const {x,y,w,h} = state.baseVB;
+    const step = Math.max(2, state.cell|0);
+    gridLayer.innerHTML='';
+
+    const cx = x + w/2, cy = y + h/2;
+    const cover = Math.hypot(w,h) * 2;
+    const startX = cx - cover/2, startY = cy - cover/2;
+    const endX   = cx + cover/2, endY   = cy + cover/2;
+
+    const makeLine=(x1,y1,x2,y2)=>{ const l=document.createElementNS('http://www.w3.org/2000/svg','line'); l.setAttribute('x1',x1); l.setAttribute('y1',y1); l.setAttribute('x2',x2); l.setAttribute('y2',y2); l.setAttribute('stroke',state.gridColor); l.setAttribute('stroke-opacity',state.alpha); l.setAttribute('stroke-width','1'); l.setAttribute('stroke-dasharray','4 4'); return l; };
+
+    for(let gx = Math.floor(startX/step)*step; gx <= endX; gx += step){ gridLayer.appendChild(makeLine(gx,startY,gx,endY)); }
+    for(let gy = Math.floor(startY/step)*step; gy <= endY; gy += step){ gridLayer.appendChild(makeLine(startX,gy,endX,gy)); }
+
+    applyGridTransform();
+    applyGridStyle(true);
+    gridLayer.style.display = state.showGrid ? '' : 'none';
+  }
+
+  function applyGridStyle(updateColor){ if(!gridLayer) return; gridLayer.querySelectorAll('line').forEach(l=>{ if(updateColor) l.setAttribute('stroke',state.gridColor); l.setAttribute('stroke-opacity',state.alpha); }); }
+  function applyGridTransform(){ const {x,y,w,h} = state.baseVB; const cx = x + w/2, cy = y + h/2; gridLayer.setAttribute('transform', `rotate(${state.angle} ${cx} ${cy})`); }
+
+  // === Tokens ===
+  btnAdd.onclick = ()=>{ 
+    if(!svg) return; 
+    const vb = svg.viewBox.baseVal;
+    let x = vb.x + vb.width/2;
+    let y = vb.y + vb.height/2;
+    if (state.snap && state.cell>1){ const p = snapToRotatedGridCenter({x,y}); x = p.x; y = p.y; }
+    const g=createToken({ x, y });
+    tokensLayer.appendChild(g);
+    registerTokenInLayers(g);
+  };
+
+  function createToken({x,y,label}){
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.classList.add('token');
+    const id = `t${++tokenSeq}`;
+    g.dataset.id = id;
+    g.setAttribute('tabindex','0');
+
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle'); c.setAttribute('class','chip');
+    const t = document.createElementNS('http://www.w3.org/2000/svg','text'); t.setAttribute('class','label'); t.textContent = label || (`H${tokenSeq}`);
+    g.appendChild(c); g.appendChild(t);
+    updateTokenStyle(g);
+    setTranslate(g,x,y);
+
+    // начальные флаги
+    g.dataset.locked = 'false';
+    g.dataset.hidden = 'false';
+
+    return g;
+  }
+
+  function setTokenLocked(g, locked){
+    g.dataset.locked = locked ? 'true' : 'false';
+    if (locked) g.classList.add('locked'); else g.classList.remove('locked');
+  }
+  function setTokenVisible(g, visible){
+    g.dataset.hidden = visible ? 'false' : 'true';
+    g.style.display = visible ? '' : 'none';
+  }
+
+  function updateTokenStyle(g){
+    const r = Math.max(4, (state.cell * state.tokenSizeCells)/2);
+    const c = g.querySelector('.chip'); const t = g.querySelector('.label');
+    c.setAttribute('r', r); c.setAttribute('cx', 0); c.setAttribute('cy', 0); c.setAttribute('fill', state.tokenColor);
+    t.setAttribute('font-size', String(Math.max(8, Math.round(r*0.9))));
+  }
+  function updateAllTokensStyle(){ tokensLayer && tokensLayer.querySelectorAll('.token').forEach(updateTokenStyle); }
+
+  function setTranslate(el,x,y){ el.dataset.x=x; el.dataset.y=y; el.setAttribute('transform', `translate(${x},${y})`); }
+  function getTranslate(el){ return { x: parseFloat(el.dataset.x||'0'), y: parseFloat(el.dataset.y||'0') }; }
+
+  // === Layers panel logic ===
+  function registerTokenInLayers(g){
+    const id = g.dataset.id;
+    const row = document.createElement('div');
+    row.className = 'layer-row';
+    row.dataset.id = id;
+
+    // 👁 visibility
+    const vis = document.createElement('button');
+    vis.className = 'iconbtn';
+    vis.title = 'Показать/скрыть';
+    vis.innerText = '👁';
+    vis.dataset.on = 'true';
+
+    // 🔒 lock
+    const lock = document.createElement('button');
+    lock.className = 'iconbtn';
+    lock.title = 'Заморозить/разморозить';
+    lock.innerText = '🔒';
+    lock.dataset.on = 'false';
+
+    // name editor
+    const name = document.createElement('input');
+    name.type = 'text';
+    name.value = g.querySelector('.label').textContent;
+
+    // wiring
+    vis.onclick = ()=>{
+      const on = vis.dataset.on === 'true';
+      vis.dataset.on = on ? 'false' : 'true';
+      setTokenVisible(g, !on);
+    };
+    lock.onclick = ()=>{
+      const on = lock.dataset.on === 'true';
+      lock.dataset.on = on ? 'false' : 'true';
+      setTokenLocked(g, !on ? true : false);
+    };
+    name.oninput = ()=>{
+      g.querySelector('.label').textContent = name.value || '';
+    };
+
+    row.appendChild(vis);
+    row.appendChild(lock);
+    row.appendChild(name);
+    layersList.appendChild(row);
+    refreshTokenCount();
+  }
+
+  function rebuildLayersPanel(){
+    layersList.innerHTML='';
+    tokenSeq = 0;
+    // переинициализируем seq по текущим токенам, сохраняя их id если уже есть
+    const toks = tokensLayer ? Array.from(tokensLayer.querySelectorAll('.token')) : [];
+    toks.forEach(t=>{
+      if(!t.dataset.id){ t.dataset.id = `t${++tokenSeq}`; }
+      else {
+        const n = parseInt(t.dataset.id.slice(1),10);
+        if (Number.isFinite(n)) tokenSeq = Math.max(tokenSeq, n);
+      }
+      registerTokenInLayers(t);
+      // применить флаги если были
+      setTokenLocked(t, t.dataset.locked === 'true');
+      setTokenVisible(t, t.dataset.hidden !== 'true');
+      // синхронизировать кнопки
+      const row = layersList.querySelector(`.layer-row[data-id="${t.dataset.id}"]`);
+      if (row){
+        row.querySelector('.iconbtn:nth-child(1)').dataset.on = (t.dataset.hidden !== 'true') ? 'true' : 'false';
+        row.querySelector('.iconbtn:nth-child(2)').dataset.on = (t.dataset.locked === 'true') ? 'true' : 'false';
+        row.querySelector('input[type="text"]').value = t.querySelector('.label').textContent;
+      }
+    });
+    refreshTokenCount();
+  }
+
+  function refreshTokenCount(){
+    const total = tokensLayer ? tokensLayer.querySelectorAll('.token').length : 0;
+    tokenCount.textContent = total ? `${total} шт.` : 'нет фишек';
+  }
+
+  // === Pointer handlers (drag tokens, pan/zoom view) ===
+  function enableInputHandlers(){
+    svg.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    svg.addEventListener('wheel', onWheel, { passive:false });
+    svg.addEventListener('contextmenu', e=> e.preventDefault());
+    window.addEventListener('resize', ()=> drawGrid());
+  }
+
+  function onPointerDown(e){
+    const tokenEl = e.target && e.target.closest ? e.target.closest('.token') : null;
+    if (tokenEl){
+      // игнор, если токен заблокирован
+      if (tokenEl.dataset.locked === 'true') { return; }
+      e.preventDefault();
+      const start = getSVGPoint(e); const cur = getTranslate(tokenEl);
+      dragging = { el: tokenEl, offset: { x: cur.x - start.x, y: cur.y - start.y } };
+      return;
+    }
+    // панорамирование ЛКМ и др.
+    const isRMB = e.button === 2; 
+    const isMMB = e.button === 1; 
+    const isShiftLMB = e.button === 0 && (e.shiftKey || e.ctrlKey || e.metaKey);
+    const isPlainLMB = e.button === 0;
+    if (isRMB || isMMB || isShiftLMB || isPlainLMB || e.pointerType==='touch'){
+      e.preventDefault();
+      const vb = svg.viewBox.baseVal;
+      panning = { startScreen: {x:e.clientX, y:e.clientY}, startVB: {x:vb.x, y:vb.y, w:vb.width, h:vb.height} };
+    }
+  }
+
+  function onPointerMove(e){
+    if (dragging){
+      const p = getSVGPoint(e);
+      let nx = p.x + dragging.offset.x; let ny = p.y + dragging.offset.y;
+      if (state.snap && state.cell>1){ const snapped = snapToRotatedGridCenter({x:nx,y:ny}); nx = snapped.x; ny = snapped.y; }
+      setTranslate(dragging.el, nx, ny);
+      return;
+    }
+    if (panning){
+      const vb = svg.viewBox.baseVal;
+      const scaleX = vb.width / svg.clientWidth;
+      const scaleY = vb.height / svg.clientHeight;
+      const dx = (e.clientX - panning.startScreen.x) * scaleX;
+      const dy = (e.clientY - panning.startScreen.y) * scaleY;
+      setViewBox(panning.startVB.x - dx, panning.startVB.y - dy, vb.width, vb.height);
+    }
+  }
+
+  function onPointerUp(){ dragging=null; panning=null; }
+
+  function onWheel(e){
+    if (!svg) return; 
+    e.preventDefault();
+    const vb = svg.viewBox.baseVal;
+    const scale = Math.pow(0.85, -Math.sign(e.deltaY)); // up — ближе; down — дальше
+    const mx = e.offsetX / svg.clientWidth  * vb.width  + vb.x;
+    const my = e.offsetY / svg.clientHeight * vb.height + vb.y;
+    zoomAt({x:mx, y:my}, scale);
+  }
+
+  function zoomAt(point, scale){
+    const vb = svg.viewBox.baseVal;
+    const anchorX = point ? point.x : (vb.x + vb.width/2);
+    const anchorY = point ? point.y : (vb.y + vb.height/2);
+
+    let newW = clamp(vb.width * scale, state.baseVB.w*0.2, state.baseVB.w*8);
+    let newH = newW * (vb.height / vb.width);
+
+    const k = newW / vb.width;
+    const nx = anchorX - (anchorX - vb.x) * k;
+    const ny = anchorY - (anchorY - vb.y) * k;
+
+    setViewBox(nx, ny, newW, newH);
+  }
+
+  function resetView(){ setViewBox(state.baseVB.x, state.baseVB.y, state.baseVB.w, state.baseVB.h); }
+  function setViewBox(x,y,w,h){ svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`); }
+
+  // Screen -> world point
+  function getSVGPoint(evt){ const pt=svg.createSVGPoint(); pt.x=evt.clientX; pt.y=evt.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); }
+
+  // Snap to cell CENTERS (in rotated grid coordinates)
+  function snapToRotatedGridCenter(p){
+    const {x,y,w,h} = state.baseVB; const cx = x + w/2, cy = y + h/2;
+    const ang = -state.angle * Math.PI/180; // rotate point into grid frame
+    const rx = Math.cos(ang)*(p.x - cx) - Math.sin(ang)*(p.y - cy) + cx;
+    const ry = Math.sin(ang)*(p.x - cx) + Math.cos(ang)*(p.y - cy) + cy;
+
+    const sx = Math.round((rx - state.cell/2) / state.cell) * state.cell + state.cell/2;
+    const sy = Math.round((ry - state.cell/2) / state.cell) * state.cell + state.cell/2;
+
+    const ang2 = state.angle * Math.PI/180; // rotate back to world frame
+    const fx = Math.cos(ang2)*(sx - cx) - Math.sin(ang2)*(sy - cy) + cy*0 + (sx - cx)*0 + cx - Math.sin(ang2)*(sy - cy);
+    // Ой, выше получилось нечитаемо — оставим в нормальном виде:
+  }
+
+  // (исправление из-за случайной правки при редактировании)
+  function snapToRotatedGridCenter(p){
+    const {x,y,w,h} = state.baseVB; const cx = x + w/2, cy = y + h/2;
+    const ang = -state.angle * Math.PI/180;
+    const rx = Math.cos(ang)*(p.x - cx) - Math.sin(ang)*(p.y - cy) + cx;
+    const ry = Math.sin(ang)*(p.x - cx) + Math.cos(ang)*(p.y - cy) + cy;
+
+    const sx = Math.round((rx - state.cell/2) / state.cell) * state.cell + state.cell/2;
+    const sy = Math.round((ry - state.cell/2) / state.cell) * state.cell + state.cell/2;
+
+    const ang2 = state.angle * Math.PI/180;
+    const fx = Math.cos(ang2)*(sx - cx) - Math.sin(ang2)*(sy - cy) + cx;
+    const fy = Math.sin(ang2)*(sx - cx) + Math.cos(ang2)*(sy - cy) + cy;
+    return {x:fx, y:fy};
+  }
+
+  // === Save/Load ===
+  btnSave.onclick = ()=>{
+    if (!svg) return;
+    const vb = svg.viewBox.baseVal;
+    const data = {
+      cell: state.cell, angle: state.angle, alpha: state.alpha, gridColor: state.gridColor, showGrid: state.showGrid,
+      tokenSizeCells: state.tokenSizeCells, tokenColor: state.tokenColor,
+      viewBox: {x: vb.x, y: vb.y, w: vb.width, h: vb.height},
+      tokens: Array.from(tokensLayer.querySelectorAll('.token')).map(t=>({
+        t: getTranslate(t),
+        label: t.querySelector('.label').textContent,
+        id: t.dataset.id,
+        locked: t.dataset.locked === 'true',
+        hidden: t.dataset.hidden === 'true'
+      }))
+    };
+    localStorage.setItem('vtt_tokens_v5_layers', JSON.stringify(data));
+    alert('Сохранено');
+  };
+
+  btnLoad.onclick = ()=>{
+    const raw = localStorage.getItem('vtt_tokens_v5_layers'); 
+    if (!raw) return;
+    const st = JSON.parse(raw);
+    state.cell = st.cell ?? state.cell; cellInput.value = state.cell;
+    state.angle = st.angle ?? state.angle; angleInput.value = state.angle;
+    state.alpha = st.alpha ?? state.alpha; alphaInput.value = state.alpha;
+    state.gridColor = st.gridColor ?? state.gridColor; colorInput.value = state.gridColor;
+    state.showGrid = st.showGrid ?? state.showGrid; showGridInput.checked = !!state.showGrid;
+    state.tokenSizeCells = st.tokenSizeCells ?? state.tokenSizeCells; tokenSizeInput.value = state.tokenSizeCells;
+    state.tokenColor = st.tokenColor ?? state.tokenColor; tokenColorInput.value = state.tokenColor;
+    drawGrid();
+    if (st.viewBox) setViewBox(st.viewBox.x, st.viewBox.y, st.viewBox.w, st.viewBox.h);
+
+    tokensLayer.innerHTML='';
+    layersList.innerHTML='';
+    tokenSeq = 0;
+
+    for (const it of (st.tokens||[])){
+      const g = createToken({ x: it.t.x, y: it.t.y, label: it.label });
+      if (it.id){ g.dataset.id = it.id; const n = parseInt(it.id.slice(1),10); if(Number.isFinite(n)) tokenSeq = Math.max(tokenSeq, n); }
+      setTokenLocked(g, !!it.locked);
+      setTokenVisible(g, !it.hidden);
+      tokensLayer.appendChild(g);
+      registerTokenInLayers(g);
+      // sync кнопок
+      const row = layersList.querySelector(`.layer-row[data-id="${g.dataset.id}"]`);
+      if (row){
+        row.querySelector('.iconbtn:nth-child(1)').dataset.on = (!it.hidden) ? 'true' : 'false';
+        row.querySelector('.iconbtn:nth-child(2)').dataset.on = (it.locked) ? 'true' : 'false';
+        row.querySelector('input[type="text"]').value = g.querySelector('.label').textContent;
+      }
+    }
+    refreshTokenCount();
+    alert('Загружено');
+  };
+
+  // === Utils ===
+  function toInt(v,def=0){ const n=parseInt(v,10); return Number.isFinite(n)?n:def; }
+  function toFloat(v,def=0){ const n=parseFloat(v); return Number.isFinite(n)?n:def; }
+  function clamp(n,mi,ma){ return Math.max(mi, Math.min(ma, n)); }
+})();
+</script>
+</body>
+</html>
