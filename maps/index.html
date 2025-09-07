@@ -25,8 +25,9 @@
     #layers .head{position:sticky;top:0;background:linear-gradient(180deg,#0f1218,#0f1218F0);padding:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
     #layers .head .title{font-weight:700}
     #layers .list{padding:8px;display:flex;flex-direction:column;gap:6px}
-    .layer-row{display:grid;grid-template-columns: 24px 24px 1fr;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;padding:6px 8px;background:#0e1218}
+    .layer-row{display:grid;grid-template-columns:24px 24px 24px 1fr;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;padding:6px 8px;background:#0e1218}
     .layer-row input[type="text"]{width:100%;background:transparent;border:1px solid #222a33;border-radius:6px;padding:4px 6px;color:var(--text)}
+    .layer-row input[type="color"]{appearance:none;width:20px;height:20px;border:1px solid #29303a;border-radius:6px;background:#121720;padding:0;cursor:pointer}
     .iconbtn{appearance:none;width:20px;height:20px;border:1px solid #29303a;border-radius:6px;background:#121720;display:grid;place-items:center;cursor:pointer}
     .iconbtn[data-on="true"]{border-color:#355;color:var(--accent)}
     .small{font-size:12px;color:var(--muted)}
@@ -37,7 +38,7 @@
     .token{filter:var(--token-shadow);cursor:grab;user-select:none}
     .token:active{cursor:grabbing}
     .token.locked{cursor:not-allowed}
-    .token .chip{fill:var(--token);stroke:var(--token-stroke);stroke-width:2}
+    .token .chip{stroke:var(--token-stroke);stroke-width:2}
     .token.locked .chip{stroke-dasharray:3 3}
     .token .label{font:700 12px/1 sans-serif;text-anchor:middle;dominant-baseline:central;fill:#222}
   </style>
@@ -128,8 +129,11 @@
   showGridInput.onchange=()=>{ state.showGrid = showGridInput.checked; if(gridLayer) gridLayer.style.display = state.showGrid?'':'none'; };
   snapInput.onchange=()=>{ state.snap = snapInput.checked; };
 
-  tokenSizeInput.oninput=()=>{ state.tokenSizeCells = Math.max(0.1, toFloat(tokenSizeInput.value,1)); updateAllTokensStyle(); };
-  tokenColorInput.oninput=()=>{ state.tokenColor = tokenColorInput.value; updateAllTokensStyle(); };
+    tokenSizeInput.oninput=()=>{ state.tokenSizeCells = Math.max(0.1, toFloat(tokenSizeInput.value,1)); updateAllTokensStyle(); };
+    tokenColorInput.oninput=()=>{
+      state.tokenColor = tokenColorInput.value;
+      tokensLayer && tokensLayer.querySelectorAll('.token').forEach(t=> setTokenColor(t, state.tokenColor));
+    };
 
   // корректный зум
   zoomInBtn.onclick = ()=> zoomAt(null, 0.85);
@@ -217,8 +221,9 @@
 
     const c = document.createElementNS('http://www.w3.org/2000/svg','circle'); c.setAttribute('class','chip');
     const t = document.createElementNS('http://www.w3.org/2000/svg','text'); t.setAttribute('class','label'); t.textContent = label || (`H${tokenSeq}`);
-    g.appendChild(c); g.appendChild(t);
-    updateTokenStyle(g);
+      g.appendChild(c); g.appendChild(t);
+      g.dataset.color = state.tokenColor;
+      updateTokenStyle(g);
     setTranslate(g,x,y);
 
     // начальные флаги
@@ -232,15 +237,25 @@
     g.dataset.locked = locked ? 'true' : 'false';
     if (locked) g.classList.add('locked'); else g.classList.remove('locked');
   }
-  function setTokenVisible(g, visible){
-    g.dataset.hidden = visible ? 'false' : 'true';
-    g.style.display = visible ? '' : 'none';
-  }
+    function setTokenVisible(g, visible){
+      g.dataset.hidden = visible ? 'false' : 'true';
+      g.style.display = visible ? '' : 'none';
+    }
 
-  function updateTokenStyle(g){
-    const r = Math.max(4, (state.cell * state.tokenSizeCells)/2);
-    const c = g.querySelector('.chip'); const t = g.querySelector('.label');
-    c.setAttribute('r', r); c.setAttribute('cx', 0); c.setAttribute('cy', 0); c.setAttribute('fill', state.tokenColor);
+    function setTokenColor(g, color){
+      g.dataset.color = color;
+      updateTokenStyle(g);
+      const row = layersList.querySelector(`.layer-row[data-id="${g.dataset.id}"] input[type="color"]`);
+      if (row) row.value = color;
+    }
+
+    function updateTokenStyle(g){
+      const r = Math.max(4, (state.cell * state.tokenSizeCells)/2);
+      const c = g.querySelector('.chip'); const t = g.querySelector('.label');
+      c.setAttribute('r', r);
+      c.setAttribute('cx', 0);
+      c.setAttribute('cy', 0);
+      c.setAttribute('fill', g.dataset.color || state.tokenColor);
     t.setAttribute('font-size', String(Math.max(8, Math.round(r*0.9))));
   }
   function updateAllTokensStyle(){ tokensLayer && tokensLayer.querySelectorAll('.token').forEach(updateTokenStyle); }
@@ -263,16 +278,21 @@
     vis.dataset.on = 'true';
 
     // 🔒 lock
-    const lock = document.createElement('button');
-    lock.className = 'iconbtn';
-    lock.title = 'Заморозить/разморозить';
-    lock.innerText = '🔒';
-    lock.dataset.on = 'false';
+      const lock = document.createElement('button');
+      lock.className = 'iconbtn';
+      lock.title = 'Заморозить/разморозить';
+      lock.innerText = '🔒';
+      lock.dataset.on = 'false';
 
-    // name editor
-    const name = document.createElement('input');
-    name.type = 'text';
-    name.value = g.querySelector('.label').textContent;
+      // color picker
+      const clr = document.createElement('input');
+      clr.type = 'color';
+      clr.value = g.dataset.color || state.tokenColor;
+
+      // name editor
+      const name = document.createElement('input');
+      name.type = 'text';
+      name.value = g.querySelector('.label').textContent;
 
     // wiring
     vis.onclick = ()=>{
@@ -280,21 +300,25 @@
       vis.dataset.on = on ? 'false' : 'true';
       setTokenVisible(g, !on);
     };
-    lock.onclick = ()=>{
-      const on = lock.dataset.on === 'true';
-      lock.dataset.on = on ? 'false' : 'true';
-      setTokenLocked(g, !on ? true : false);
-    };
-    name.oninput = ()=>{
-      g.querySelector('.label').textContent = name.value || '';
-    };
+      lock.onclick = ()=>{
+        const on = lock.dataset.on === 'true';
+        lock.dataset.on = on ? 'false' : 'true';
+        setTokenLocked(g, !on ? true : false);
+      };
+      clr.oninput = ()=>{
+        setTokenColor(g, clr.value);
+      };
+      name.oninput = ()=>{
+        g.querySelector('.label').textContent = name.value || '';
+      };
 
-    row.appendChild(vis);
-    row.appendChild(lock);
-    row.appendChild(name);
-    layersList.appendChild(row);
-    refreshTokenCount();
-  }
+      row.appendChild(vis);
+      row.appendChild(lock);
+      row.appendChild(clr);
+      row.appendChild(name);
+      layersList.appendChild(row);
+      refreshTokenCount();
+    }
 
   function rebuildLayersPanel(){
     layersList.innerHTML='';
@@ -313,12 +337,14 @@
       setTokenVisible(t, t.dataset.hidden !== 'true');
       // синхронизировать кнопки
       const row = layersList.querySelector(`.layer-row[data-id="${t.dataset.id}"]`);
-      if (row){
-        row.querySelector('.iconbtn:nth-child(1)').dataset.on = (t.dataset.hidden !== 'true') ? 'true' : 'false';
-        row.querySelector('.iconbtn:nth-child(2)').dataset.on = (t.dataset.locked === 'true') ? 'true' : 'false';
-        row.querySelector('input[type="text"]').value = t.querySelector('.label').textContent;
-      }
-    });
+        if (row){
+          row.querySelector('.iconbtn:nth-child(1)').dataset.on = (t.dataset.hidden !== 'true') ? 'true' : 'false';
+          row.querySelector('.iconbtn:nth-child(2)').dataset.on = (t.dataset.locked === 'true') ? 'true' : 'false';
+          row.querySelector('input[type="text"]').value = t.querySelector('.label').textContent;
+          const cInp = row.querySelector('input[type="color"]');
+          if (cInp) cInp.value = t.dataset.color || state.tokenColor;
+        }
+      });
     refreshTokenCount();
   }
 
@@ -328,14 +354,31 @@
   }
 
   // === Pointer handlers (drag tokens, pan/zoom view) ===
-  function enableInputHandlers(){
-    svg.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-    svg.addEventListener('wheel', onWheel, { passive:false });
-    svg.addEventListener('contextmenu', e=> e.preventDefault());
-    window.addEventListener('resize', ()=> drawGrid());
-  }
+    function enableInputHandlers(){
+      svg.addEventListener('pointerdown', onPointerDown);
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerUp);
+      svg.addEventListener('wheel', onWheel, { passive:false });
+      svg.addEventListener('contextmenu', onContextMenu);
+      window.addEventListener('resize', ()=> drawGrid());
+    }
+
+    function onContextMenu(e){
+      e.preventDefault();
+      const tokenEl = e.target && e.target.closest ? e.target.closest('.token') : null;
+      if (tokenEl){
+        const picker = document.createElement('input');
+        picker.type = 'color';
+        picker.value = tokenEl.dataset.color || state.tokenColor;
+        picker.style.position = 'fixed';
+        picker.style.left = '-1000px';
+        document.body.appendChild(picker);
+        picker.addEventListener('input', ()=> setTokenColor(tokenEl, picker.value));
+        picker.addEventListener('change', ()=> picker.remove());
+        dragging = null;
+        picker.click();
+      }
+    }
 
   function onPointerDown(e){
     const tokenEl = e.target && e.target.closest ? e.target.closest('.token') : null;
@@ -413,21 +456,6 @@
   // Snap to cell CENTERS (in rotated grid coordinates)
   function snapToRotatedGridCenter(p){
     const {x,y,w,h} = state.baseVB; const cx = x + w/2, cy = y + h/2;
-    const ang = -state.angle * Math.PI/180; // rotate point into grid frame
-    const rx = Math.cos(ang)*(p.x - cx) - Math.sin(ang)*(p.y - cy) + cx;
-    const ry = Math.sin(ang)*(p.x - cx) + Math.cos(ang)*(p.y - cy) + cy;
-
-    const sx = Math.round((rx - state.cell/2) / state.cell) * state.cell + state.cell/2;
-    const sy = Math.round((ry - state.cell/2) / state.cell) * state.cell + state.cell/2;
-
-    const ang2 = state.angle * Math.PI/180; // rotate back to world frame
-    const fx = Math.cos(ang2)*(sx - cx) - Math.sin(ang2)*(sy - cy) + cy*0 + (sx - cx)*0 + cx - Math.sin(ang2)*(sy - cy);
-    // Ой, выше получилось нечитаемо — оставим в нормальном виде:
-  }
-
-  // (исправление из-за случайной правки при редактировании)
-  function snapToRotatedGridCenter(p){
-    const {x,y,w,h} = state.baseVB; const cx = x + w/2, cy = y + h/2;
     const ang = -state.angle * Math.PI/180;
     const rx = Math.cos(ang)*(p.x - cx) - Math.sin(ang)*(p.y - cy) + cx;
     const ry = Math.sin(ang)*(p.x - cx) + Math.cos(ang)*(p.y - cy) + cy;
@@ -449,14 +477,15 @@
       cell: state.cell, angle: state.angle, alpha: state.alpha, gridColor: state.gridColor, showGrid: state.showGrid,
       tokenSizeCells: state.tokenSizeCells, tokenColor: state.tokenColor,
       viewBox: {x: vb.x, y: vb.y, w: vb.width, h: vb.height},
-      tokens: Array.from(tokensLayer.querySelectorAll('.token')).map(t=>({
-        t: getTranslate(t),
-        label: t.querySelector('.label').textContent,
-        id: t.dataset.id,
-        locked: t.dataset.locked === 'true',
-        hidden: t.dataset.hidden === 'true'
-      }))
-    };
+        tokens: Array.from(tokensLayer.querySelectorAll('.token')).map(t=>({
+          t: getTranslate(t),
+          label: t.querySelector('.label').textContent,
+          id: t.dataset.id,
+          locked: t.dataset.locked === 'true',
+          hidden: t.dataset.hidden === 'true',
+          color: t.dataset.color
+        }))
+      };
     localStorage.setItem('vtt_tokens_v5_layers', JSON.stringify(data));
     alert('Сохранено');
   };
@@ -479,9 +508,11 @@
     layersList.innerHTML='';
     tokenSeq = 0;
 
-    for (const it of (st.tokens||[])){
+      for (const it of (st.tokens||[])){
       const g = createToken({ x: it.t.x, y: it.t.y, label: it.label });
       if (it.id){ g.dataset.id = it.id; const n = parseInt(it.id.slice(1),10); if(Number.isFinite(n)) tokenSeq = Math.max(tokenSeq, n); }
+      g.dataset.color = it.color || state.tokenColor;
+      updateTokenStyle(g);
       setTokenLocked(g, !!it.locked);
       setTokenVisible(g, !it.hidden);
       tokensLayer.appendChild(g);
@@ -492,11 +523,13 @@
         row.querySelector('.iconbtn:nth-child(1)').dataset.on = (!it.hidden) ? 'true' : 'false';
         row.querySelector('.iconbtn:nth-child(2)').dataset.on = (it.locked) ? 'true' : 'false';
         row.querySelector('input[type="text"]').value = g.querySelector('.label').textContent;
+        const cInp = row.querySelector('input[type="color"]');
+        if (cInp) cInp.value = g.dataset.color;
       }
     }
-    refreshTokenCount();
-    alert('Загружено');
-  };
+      refreshTokenCount();
+      alert('Загружено');
+    };
 
   // === Utils ===
   function toInt(v,def=0){ const n=parseInt(v,10); return Number.isFinite(n)?n:def; }
