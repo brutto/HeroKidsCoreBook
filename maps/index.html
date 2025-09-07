@@ -47,7 +47,7 @@
 </head>
 <body>
 <div class="toolbar">
-  <label class="btn">Загрузить SVG<input id="file" type="file" accept=".svg" hidden></label>
+  <label class="btn">Загрузить SVG<input id="file" type="file" accept=".svg,.png,.jpg,.jpeg" hidden></label>
   <label>Клетка: <input id="cell" class="num" type="number" min="4" step="1" value="32"></label>
   <label>Поворот: <input id="angle" class="num" type="number" step="1" value="0">°</label>
   <label>Прозрачность: <input id="alpha" type="range" min="0" max="1" step="0.05" value="0.35"></label>
@@ -142,10 +142,28 @@
   zoomOutBtn.onclick= ()=> zoomAt(null, 1/0.85);
   zoomResetBtn.onclick= ()=> resetView();
 
-  // === Load SVG ===
-  fileInput.onchange = async (e)=>{ const f=e.target.files?.[0]; if(f) mountSVG(await f.text()); };
+  // === Load map ===
+  fileInput.onchange = async (e)=>{ const f=e.target.files?.[0]; if(f) handleFile(f); };
   drop.ondragover = e=>{ e.preventDefault(); };
-  drop.ondrop = async e=>{ e.preventDefault(); const f=e.dataTransfer?.files?.[0]; if(f) mountSVG(await f.text()); };
+  drop.ondrop = async e=>{ e.preventDefault(); const f=e.dataTransfer?.files?.[0]; if(f) handleFile(f); };
+
+  async function handleFile(f){
+    const name = f.name.toLowerCase();
+    if (name.endsWith('.svg') || f.type === 'image/svg+xml'){
+      mountSVG(await f.text());
+    } else if (name.match(/\.(png|jpe?g)$/) || /^image\/(png|jpeg)$/.test(f.type)){
+      mountImage(await fileToDataURL(f));
+    }
+  }
+
+  function fileToDataURL(f){
+    return new Promise((resolve,reject)=>{
+      const fr = new FileReader();
+      fr.onload = ()=>resolve(fr.result);
+      fr.onerror = reject;
+      fr.readAsDataURL(f);
+    });
+  }
 
   function mountSVG(text){
     svgBox.innerHTML='';
@@ -173,6 +191,41 @@
 
     // пересчитать список слоёв (если svg перезагружен)
     rebuildLayersPanel();
+  }
+
+  function mountImage(url){
+    svgBox.innerHTML='';
+    const img = new Image();
+    img.onload = ()=>{
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+      svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+      svg.style.width='100%';
+      svg.style.height='100%';
+
+      contentLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
+      const imgEl = document.createElementNS('http://www.w3.org/2000/svg','image');
+      imgEl.setAttribute('href', url);
+      imgEl.setAttribute('width', w);
+      imgEl.setAttribute('height', h);
+      contentLayer.appendChild(imgEl);
+      svg.appendChild(contentLayer);
+
+      gridLayer = document.createElementNS('http://www.w3.org/2000/svg','g'); gridLayer.id='grid-layer'; svg.appendChild(gridLayer);
+      tokensLayer = document.createElementNS('http://www.w3.org/2000/svg','g'); tokensLayer.id='tokens-layer'; svg.appendChild(tokensLayer);
+      svg.insertBefore(gridLayer, tokensLayer);
+
+      state.baseVB = {x:0, y:0, w:w, h:h};
+      setViewBox(0,0,w,h);
+
+      drawGrid();
+      enableInputHandlers();
+      svgBox.appendChild(svg);
+
+      rebuildLayersPanel();
+    };
+    img.src = url;
   }
 
   function ensureViewBox(s){ if(!s.getAttribute('viewBox')){ const w=parseFloat(s.getAttribute('width'))||1000; const h=parseFloat(s.getAttribute('height'))||1000; s.setAttribute('viewBox',`0 0 ${w} ${h}`); } }
@@ -568,6 +621,7 @@
       cell: state.cell, angle: state.angle, alpha: state.alpha, gridColor: state.gridColor, showGrid: state.showGrid,
       tokenSizeCells: state.tokenSizeCells, tokenColor: state.tokenColor,
       viewBox: {x: vb.x, y: vb.y, w: vb.width, h: vb.height},
+      baseVB: state.baseVB,
         tokens: Array.from(tokensLayer.querySelectorAll('.token')).map(t=>({
           t: getTranslate(t),
           label: t.querySelector('.label').textContent,
@@ -592,6 +646,7 @@
     state.showGrid = st.showGrid ?? state.showGrid; showGridInput.checked = !!state.showGrid;
     state.tokenSizeCells = st.tokenSizeCells ?? state.tokenSizeCells; tokenSizeInput.value = state.tokenSizeCells;
     state.tokenColor = st.tokenColor ?? state.tokenColor; tokenColorInput.value = state.tokenColor;
+    state.baseVB = st.baseVB ?? state.baseVB;
     drawGrid();
     if (st.viewBox) setViewBox(st.viewBox.x, st.viewBox.y, st.viewBox.w, st.viewBox.h);
 
