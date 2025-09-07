@@ -32,6 +32,8 @@
     .iconbtn[data-on="true"]{border-color:#355;color:var(--accent)}
     .small{font-size:12px;color:var(--muted)}
 
+    .context-menu{position:fixed;z-index:100;background:var(--paper);border:1px solid var(--border);border-radius:8px;padding:4px;display:flex;flex-direction:column;gap:4px}
+  
     svg{user-select:none;touch-action:none}
     .dropzone{display:flex;align-items:center;justify-content:center;min-height:180px;border:2px dashed #2b313a;border-radius:12px;color:var(--muted);margin:12px;background:#0f1218;cursor:pointer}
 
@@ -108,6 +110,7 @@
   let svg=null, tokensLayer=null, gridLayer=null, contentLayer=null;
   let dragging=null; let panning=null;
   let tokenSeq=0; // для уникальных id
+  let tokenMenu=null;
 
   const state={
     cell:32,
@@ -262,6 +265,32 @@
   function setTranslate(el,x,y){ el.dataset.x=x; el.dataset.y=y; el.setAttribute('transform', `translate(${x},${y})`); }
   function getTranslate(el){ return { x: parseFloat(el.dataset.x||'0'), y: parseFloat(el.dataset.y||'0') }; }
 
+  function deleteToken(g){
+    const id = g.dataset.id;
+    g.remove();
+    const row = layersList.querySelector(`.layer-row[data-id="${id}"]`);
+    if (row) row.remove();
+    refreshTokenCount();
+    hideTokenMenu();
+  }
+
+  function showTokenMenu(x,y,g){
+    hideTokenMenu();
+    tokenMenu = document.createElement('div');
+    tokenMenu.className = 'context-menu';
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn';
+    delBtn.textContent = 'Удалить';
+    delBtn.onclick = ()=>{ deleteToken(g); hideTokenMenu(); };
+    tokenMenu.appendChild(delBtn);
+    document.body.appendChild(tokenMenu);
+    tokenMenu.style.left = `${x}px`;
+    tokenMenu.style.top = `${y}px`;
+  }
+  function hideTokenMenu(){
+    if(tokenMenu){ tokenMenu.remove(); tokenMenu=null; }
+  }
+
   // === Layers panel logic ===
   function registerTokenInLayers(g){
     const id = g.dataset.id;
@@ -293,31 +322,51 @@
       name.type = 'text';
       name.value = g.querySelector('.label').textContent;
 
+    // delete
+    const del = document.createElement('button');
+    del.className = 'iconbtn';
+    del.title = 'Удалить';
+    del.innerText = '✖';
+
     // wiring
     vis.onclick = ()=>{
       const on = vis.dataset.on === 'true';
       vis.dataset.on = on ? 'false' : 'true';
       setTokenVisible(g, !on);
     };
-      lock.onclick = ()=>{
-        const on = lock.dataset.on === 'true';
-        lock.dataset.on = on ? 'false' : 'true';
-        setTokenLocked(g, !on ? true : false);
-      };
-      const handleRowColor = ()=> setTokenColor(g, clr.value);
-      clr.addEventListener('input', handleRowColor);
-      clr.addEventListener('change', handleRowColor);
-      name.oninput = ()=>{
-        g.querySelector('.label').textContent = name.value || '';
-      };
 
-      row.appendChild(vis);
-      row.appendChild(lock);
-      row.appendChild(clr);
-      row.appendChild(name);
-      layersList.appendChild(row);
-      refreshTokenCount();
-    }
+    // внутри функции, где создаётся строка слоя (row) и есть g, vis, lock, clr, name, del, layersList
+  lock.onclick = () => {
+    const on = lock.dataset.on === 'true';
+    lock.dataset.on = on ? 'false' : 'true';
+    setTokenLocked(g, !on ? true : false);
+  };
+
+  // поддержка изменения цвета (из ветки codex/...)
+  const handleRowColor = () => setTokenColor(g, clr.value);
+  clr.addEventListener('input', handleRowColor);
+  clr.addEventListener('change', handleRowColor);
+
+  // синхронизация имени
+  name.oninput = () => {
+    g.querySelector('.label').textContent = name.value || '';
+  };
+
+  // поддержка удаления (из ветки master)
+  del.onclick = () => {
+    deleteToken(g);
+  };
+
+  // Собираем строку
+  row.appendChild(vis);
+  row.appendChild(lock);
+  row.appendChild(clr);
+  row.appendChild(name);
+  row.appendChild(del);
+
+  layersList.appendChild(row);
+  refreshTokenCount();
+
 
   function rebuildLayersPanel(){
     layersList.innerHTML='';
@@ -353,33 +402,76 @@
   }
 
   // === Pointer handlers (drag tokens, pan/zoom view) ===
-    function enableInputHandlers(){
-      svg.addEventListener('pointerdown', onPointerDown);
-      window.addEventListener('pointermove', onPointerMove);
-      window.addEventListener('pointerup', onPointerUp);
-      svg.addEventListener('wheel', onWheel, { passive:false });
-      svg.addEventListener('contextmenu', onContextMenu);
-      window.addEventListener('resize', ()=> drawGrid());
+  function enableInputHandlers(){
+    svg.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    svg.addEventListener('wheel', onWheel, { passive:false });
+    svg.addEventListener('contextmenu', onContextMenu);
+    window.addEventListener('resize', ()=> drawGrid());
+
+    // клик вне меню — скрыть его (поддержка ветки master)
+    document.addEventListener('click', e=>{
+      if (tokenMenu && !tokenMenu.contains(e.target)) hideTokenMenu();
+    });
+  }
+
+  // единая логика контекстного клика по токену
+  function onContextMenu(e){
+    e.preventDefault();
+    const tokenEl = e.target && e.target.closest ? e.target.closest('.token') : null;
+
+    if (!tokenEl){
+      hideTokenMenu?.();
+      return;
     }
 
-    function onContextMenu(e){
-      e.preventDefault();
-      const tokenEl = e.target && e.target.closest ? e.target.closest('.token') : null;
-      if (tokenEl){
-        const picker = document.createElement('input');
-        picker.type = 'color';
-        picker.value = tokenEl.dataset.color || state.tokenColor;
-        picker.style.position = 'fixed';
-        picker.style.left = '-1000px';
-        document.body.appendChild(picker);
-        picker.addEventListener('input', ()=> setTokenColor(tokenEl, picker.value));
-        picker.addEventListener('change', ()=>{ setTokenColor(tokenEl, picker.value); picker.remove(); });
-        dragging = null;
-        picker.click();
-      }
+    // прекращаем возможное перетаскивание
+    dragging = null;
+
+    // Быстрый выбор цвета при Alt+ПКМ (оставлено из ветки codex)
+    if (e.altKey){
+      openColorPicker(tokenEl);
+      return;
     }
+
+    // Открываем меню (из ветки master)
+    showTokenMenu?.(e.clientX, e.clientY, tokenEl);
+
+    // Если в меню есть кнопка "сменить цвет", подвяжем к ней палитру
+    // (необязательно — сработает, только если такая кнопка есть)
+    queueMicrotask(()=>{
+      try{
+        const btn = tokenMenu?.querySelector?.('.js-token-color');
+        if (btn && !btn.dataset.bound){
+          btn.dataset.bound = '1';
+          btn.addEventListener('click', ()=>{
+            hideTokenMenu?.();
+            openColorPicker(tokenEl);
+          });
+        }
+      }catch(_){}
+    });
+  }
+
+  // Палитра цвета — перенос из ветки codex
+  function openColorPicker(tokenEl){
+    const picker = document.createElement('input');
+    picker.type = 'color';
+    picker.value = tokenEl.dataset.color || state.tokenColor;
+    picker.style.position = 'fixed';
+    picker.style.left = '-1000px';
+    document.body.appendChild(picker);
+
+    const apply = ()=> setTokenColor(tokenEl, picker.value);
+    picker.addEventListener('input', apply);
+    picker.addEventListener('change', ()=>{ apply(); picker.remove(); });
+
+    picker.click();
+  }
 
   function onPointerDown(e){
+    hideTokenMenu();
     const tokenEl = e.target && e.target.closest ? e.target.closest('.token') : null;
     if (tokenEl){
       // игнор, если токен заблокирован
