@@ -132,7 +132,6 @@
     tokenSizeInput.oninput=()=>{ state.tokenSizeCells = Math.max(0.1, toFloat(tokenSizeInput.value,1)); updateAllTokensStyle(); };
     tokenColorInput.oninput=()=>{
       state.tokenColor = tokenColorInput.value;
-      tokensLayer && tokensLayer.querySelectorAll('.token').forEach(t=> setTokenColor(t, state.tokenColor));
     };
 
   // корректный зум
