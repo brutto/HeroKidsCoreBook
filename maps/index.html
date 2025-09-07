@@ -25,12 +25,14 @@
     #layers .head{position:sticky;top:0;background:linear-gradient(180deg,#0f1218,#0f1218F0);padding:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
     #layers .head .title{font-weight:700}
     #layers .list{padding:8px;display:flex;flex-direction:column;gap:6px}
-    .layer-row{display:grid;grid-template-columns: 24px 24px 1fr;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;padding:6px 8px;background:#0e1218}
+    .layer-row{display:grid;grid-template-columns: 24px 24px 1fr 24px;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;padding:6px 8px;background:#0e1218}
     .layer-row input[type="text"]{width:100%;background:transparent;border:1px solid #222a33;border-radius:6px;padding:4px 6px;color:var(--text)}
     .iconbtn{appearance:none;width:20px;height:20px;border:1px solid #29303a;border-radius:6px;background:#121720;display:grid;place-items:center;cursor:pointer}
     .iconbtn[data-on="true"]{border-color:#355;color:var(--accent)}
     .small{font-size:12px;color:var(--muted)}
 
+    .context-menu{position:fixed;z-index:100;background:var(--paper);border:1px solid var(--border);border-radius:8px;padding:4px;display:flex;flex-direction:column;gap:4px}
+  
     svg{user-select:none;touch-action:none}
     .dropzone{display:flex;align-items:center;justify-content:center;min-height:180px;border:2px dashed #2b313a;border-radius:12px;color:var(--muted);margin:12px;background:#0f1218;cursor:pointer}
 
@@ -107,6 +109,7 @@
   let svg=null, tokensLayer=null, gridLayer=null, contentLayer=null;
   let dragging=null; let panning=null;
   let tokenSeq=0; // для уникальных id
+  let tokenMenu=null;
 
   const state={
     cell:32,
@@ -248,6 +251,32 @@
   function setTranslate(el,x,y){ el.dataset.x=x; el.dataset.y=y; el.setAttribute('transform', `translate(${x},${y})`); }
   function getTranslate(el){ return { x: parseFloat(el.dataset.x||'0'), y: parseFloat(el.dataset.y||'0') }; }
 
+  function deleteToken(g){
+    const id = g.dataset.id;
+    g.remove();
+    const row = layersList.querySelector(`.layer-row[data-id="${id}"]`);
+    if (row) row.remove();
+    refreshTokenCount();
+    hideTokenMenu();
+  }
+
+  function showTokenMenu(x,y,g){
+    hideTokenMenu();
+    tokenMenu = document.createElement('div');
+    tokenMenu.className = 'context-menu';
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn';
+    delBtn.textContent = 'Удалить';
+    delBtn.onclick = ()=>{ deleteToken(g); hideTokenMenu(); };
+    tokenMenu.appendChild(delBtn);
+    document.body.appendChild(tokenMenu);
+    tokenMenu.style.left = `${x}px`;
+    tokenMenu.style.top = `${y}px`;
+  }
+  function hideTokenMenu(){
+    if(tokenMenu){ tokenMenu.remove(); tokenMenu=null; }
+  }
+
   // === Layers panel logic ===
   function registerTokenInLayers(g){
     const id = g.dataset.id;
@@ -274,6 +303,12 @@
     name.type = 'text';
     name.value = g.querySelector('.label').textContent;
 
+    // delete
+    const del = document.createElement('button');
+    del.className = 'iconbtn';
+    del.title = 'Удалить';
+    del.innerText = '✖';
+
     // wiring
     vis.onclick = ()=>{
       const on = vis.dataset.on === 'true';
@@ -288,10 +323,12 @@
     name.oninput = ()=>{
       g.querySelector('.label').textContent = name.value || '';
     };
+    del.onclick = ()=>{ deleteToken(g); };
 
     row.appendChild(vis);
     row.appendChild(lock);
     row.appendChild(name);
+    row.appendChild(del);
     layersList.appendChild(row);
     refreshTokenCount();
   }
@@ -333,11 +370,22 @@
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
     svg.addEventListener('wheel', onWheel, { passive:false });
-    svg.addEventListener('contextmenu', e=> e.preventDefault());
+    svg.addEventListener('contextmenu', e=>{
+      e.preventDefault();
+      const tokenEl = e.target && e.target.closest ? e.target.closest('.token') : null;
+      if (tokenEl){
+        dragging = null;
+        showTokenMenu(e.clientX, e.clientY, tokenEl);
+      } else {
+        hideTokenMenu();
+      }
+    });
     window.addEventListener('resize', ()=> drawGrid());
+    document.addEventListener('click', e=>{ if(tokenMenu && !tokenMenu.contains(e.target)) hideTokenMenu(); });
   }
 
   function onPointerDown(e){
+    hideTokenMenu();
     const tokenEl = e.target && e.target.closest ? e.target.closest('.token') : null;
     if (tokenEl){
       // игнор, если токен заблокирован
